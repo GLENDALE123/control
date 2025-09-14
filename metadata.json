@@ -1,0 +1,7 @@
+{
+  "name": "화성공장 통합관리시스템-1",
+  "description": "생산일보 - 일바별, 라인별, 상태별 검색과 푸터 적용",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
