@@ -35,11 +35,9 @@ import FormulationCalculator from './components/FormulationCalculator';
 import ManagementCenter from './components/ManagementCenter';
 
 
-import { db, storage, auth, messaging } from './firebaseConfig';
+import { db, storage, auth } from './firebaseConfig';
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
-import { useFCM } from './hooks/useFCM';
-import { sendPushNotification, sendBroadcastNotification, saveFCMToken } from './services/fcmService';
 
 
 type ActiveMenu = 'dashboard' | 'ledger' | 'jigList' | 'master';
@@ -105,9 +103,6 @@ const App: React.FC = () => {
   const [user, setUser] = useState<firebase.User | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  
-  // FCM 훅 사용
-  const { token: fcmToken, error: fcmError, isSupported: fcmSupported, requestPermission: requestFCMPermission, saveTokenToServer } = useFCM();
   const [requests, setRequests] = useState<JigRequest[]>([]);
   const [sampleRequests, setSampleRequests] = useState<SampleRequest[]>([]);
   const [productionRequests, setProductionRequests] = useState<ProductionRequest[]>([]);
@@ -145,23 +140,6 @@ const App: React.FC = () => {
       removeToast(id);
     }, 3000);
   }, [removeToast]);
-
-  // FCM 권한 요청 및 토큰 저장
-  const handleRequestFCMPermission = useCallback(async (): Promise<boolean> => {
-    if (!user) return false;
-    
-    const permissionGranted = await requestFCMPermission();
-    if (permissionGranted && fcmToken) {
-      console.log('FCM 토큰이 준비되었습니다:', fcmToken);
-      // FCM 토큰을 서버에 저장
-      const saved = await saveFCMToken(user.uid, fcmToken);
-      if (saved) {
-        addToast({ message: '푸시 알림이 활성화되었습니다!', type: 'success' });
-      }
-      return true;
-    }
-    return false;
-  }, [user, requestFCMPermission, fcmToken, saveFCMToken, addToast]);
 
   useEffect(() => {
     // This effect handles the Android back button behavior
@@ -246,16 +224,6 @@ const App: React.FC = () => {
                     console.error(`User profile for ${user.uid} not found. Forcing logout.`);
                     addToast({ message: '사용자 프로필을 찾을 수 없습니다. 다시 로그인해주세요.', type: 'error' });
                     await auth.signOut();
-                }
-
-                // FCM 권한 요청 (사용자 상호작용 후에 요청)
-                if (fcmSupported) {
-                    // 권한이 이미 있는 경우에만 토큰 저장
-                    if (fcmToken) {
-                        console.log('FCM 토큰이 준비되었습니다:', fcmToken);
-                        // FCM 토큰을 서버에 저장
-                        await saveFCMToken(user.uid, fcmToken);
-                    }
                 }
             } catch (error) {
                 console.error("Error fetching user profile:", error);
@@ -682,16 +650,6 @@ const App: React.FC = () => {
                 type: 'jig',
             };
             await db.collection('notifications').add(newNotification);
-            
-            // FCM 푸시 알림 전송
-            if (fcmSupported) {
-                await sendBroadcastNotification({
-                    title: '새로운 지그 요청',
-                    body: `신규 요청 '${requestData.itemName}'이(가) 등록되었습니다.`,
-                    icon: '/favicon.ico',
-                    data: { requestId: newId, type: 'jig' }
-                });
-            }
         }
     } catch (error) {
         console.error("Error saving request:", error);
@@ -750,16 +708,6 @@ const App: React.FC = () => {
             type: 'jig',
         };
         await db.collection('notifications').add(newNotification);
-        
-        // FCM 푸시 알림 전송
-        if (fcmSupported) {
-            await sendBroadcastNotification({
-                title: '지그 요청 상태 변경',
-                body: `요청 '${originalRequest.itemName}'의 상태가 '${status}'(으)로 변경되었습니다.`,
-                icon: '/favicon.ico',
-                data: { requestId: id, type: 'jig', status }
-            });
-        }
     } catch (error) {
         console.error("Error updating status:", error);
         addToast({ message: "상태 업데이트에 실패했습니다. 변경사항이 되돌려집니다.", type: "error" });
@@ -1231,20 +1179,34 @@ const App: React.FC = () => {
                 return generatedId;
             });
             
+            // 이미지 업로드 처리
+            let imageUrls: string[] = [];
             if (images.length > 0) {
-                const imageUrls = await Promise.all(
-                    images.map(file => {
-                        const ref = storage.ref(`sample-request-images/${newId}/${Date.now()}-${file.name}`);
-                        const metadata = {
-                            contentType: file.type || 'image/jpeg',
-                            cacheControl: 'public,max-age=31536000',
-                        };
-                        return ref.put(file, metadata).then(snapshot => snapshot.ref.getDownloadURL());
-                    })
-                );
-                await db.collection('sample-requests').doc(newId).update({ imageUrls });
+                try {
+                    addToast({ message: "이미지 업로드 중...", type: 'info' });
+                    imageUrls = await Promise.all(
+                        images.map(file => {
+                            const ref = storage.ref(`sample-request-images/${newId}/${Date.now()}-${file.name}`);
+                            const metadata = {
+                                contentType: file.type || 'image/jpeg',
+                                cacheControl: 'public,max-age=31536000',
+                            };
+                            return ref.put(file, metadata).then(snapshot => snapshot.ref.getDownloadURL());
+                        })
+                    );
+                    
+                    // 이미지 URL을 DB에 업데이트
+                    await db.collection('sample-requests').doc(newId).update({ imageUrls });
+                } catch (imageError) {
+                    console.error("이미지 업로드 실패:", imageError);
+                    // 이미지 업로드 실패 시 전체 트랜잭션 롤백
+                    await db.collection('sample-requests').doc(newId).delete();
+                    addToast({ message: "이미지 업로드에 실패했습니다. 요청이 취소되었습니다.", type: "error" });
+                    throw new Error("이미지 업로드 실패");
+                }
             }
             
+            // 알림 생성
             await db.collection('notifications').add({
                 message: `신규 샘플 요청 '${data.productName}'이(가) 등록되었습니다.`,
                 date: new Date().toISOString(),
@@ -1810,9 +1772,6 @@ const App: React.FC = () => {
             onSearchSubmit={handleSearchSubmit}
             notifications={notifications}
             onNotificationClick={handleNotificationClick}
-            fcmSupported={fcmSupported}
-            fcmError={fcmError}
-            onRequestFCMPermission={handleRequestFCMPermission}
         />;
       case 'management':
         return <main className="flex-1 overflow-auto p-2 sm:p-4"><ManagementCenter qualityInspections={qualityInspections} sampleRequests={sampleRequests} packagingReports={packagingReports} addToast={addToast} /></main>;

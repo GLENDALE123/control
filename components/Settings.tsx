@@ -10,6 +10,10 @@ interface SettingsProps {
   theme: Theme;
   setTheme: (theme: Theme) => void;
   currentUserProfile: UserProfile | null;
+  fcmEnabled?: boolean;
+  onToggleFCM?: (enabled: boolean) => void;
+  fcmSupported?: boolean;
+  fcmError?: string | null;
 }
 
 const SettingRow: React.FC<{
@@ -27,6 +31,47 @@ const SettingRow: React.FC<{
     </div>
   </div>
 );
+
+const FCMToggle: React.FC<{
+  enabled: boolean;
+  onToggle: (enabled: boolean) => void;
+  supported: boolean;
+  error: string | null;
+}> = ({ enabled, onToggle, supported, error }) => {
+  const handleToggle = () => {
+    if (!supported) return;
+    onToggle(!enabled);
+  };
+
+  return (
+    <div className="flex items-center space-x-3">
+      <button
+        onClick={handleToggle}
+        disabled={!supported}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+          enabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+        } ${!supported ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      >
+        <span
+          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            enabled ? 'translate-x-6' : 'translate-x-1'
+          }`}
+        />
+      </button>
+      <div className="text-sm">
+        {!supported ? (
+          <span className="text-gray-400">FCM 미지원</span>
+        ) : error ? (
+          <span className="text-red-500">{error}</span>
+        ) : enabled ? (
+          <span className="text-green-600">활성화됨</span>
+        ) : (
+          <span className="text-gray-500">비활성화됨</span>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const UserManagement: React.FC<{ currentUserProfile: UserProfile | null }> = ({ currentUserProfile }) => {
     const [users, setUsers] = useState<UserProfile[]>([]);
@@ -107,7 +152,7 @@ const UserManagement: React.FC<{ currentUserProfile: UserProfile | null }> = ({ 
 };
 
 
-const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile }) => {
+const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile, fcmEnabled, onToggleFCM, fcmSupported, fcmError }) => {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg h-full overflow-auto">
       <div className="p-6">
@@ -119,6 +164,18 @@ const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile
             description={theme === 'dark' ? '다크 모드 활성화됨. 눈의 피로를 줄여줍니다.' : '라이트 모드 활성화됨.'}
           >
             <ThemeToggle theme={theme} setTheme={setTheme} />
+          </SettingRow>
+
+          <SettingRow
+            title="푸시 알림"
+            description={fcmEnabled ? '중요한 알림을 실시간으로 받습니다.' : '푸시 알림이 비활성화되어 있습니다.'}
+          >
+            <FCMToggle
+              enabled={fcmEnabled || false}
+              onToggle={onToggleFCM || (() => {})}
+              supported={fcmSupported || false}
+              error={fcmError}
+            />
           </SettingRow>
 
           {currentUserProfile?.role === 'Admin' && <UserManagement currentUserProfile={currentUserProfile} />}

@@ -1,5 +1,6 @@
-// 서버 사이드 FCM 전송을 위한 서비스
-// 실제 프로덕션에서는 Node.js 서버에서 FCM Admin SDK를 사용해야 합니다
+// Firebase Functions를 사용한 FCM 서비스
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getApp } from 'firebase/app';
 
 interface FCMNotificationPayload {
   title: string;
@@ -16,24 +17,24 @@ interface FCMTokenData {
   lastUsed: string;
 }
 
+// Firebase Functions 초기화
+const functions = getFunctions(getApp());
+
 /**
- * 사용자의 FCM 토큰을 Firestore에 저장
+ * 사용자의 FCM 토큰을 Firebase Functions를 통해 저장
  */
 export const saveUserFCMToken = async (userId: string, token: string, deviceType: 'web' | 'mobile' = 'web') => {
   try {
-    const tokenData: FCMTokenData = {
+    const saveToken = httpsCallable(functions, 'saveFCMToken');
+    
+    const result = await saveToken({
       userId,
       token,
-      deviceType,
-      lastUsed: new Date().toISOString()
-    };
-
-    // Firestore에 토큰 저장
-    const { db } = await import('../firebaseConfig');
-    await db.collection('fcm_tokens').doc(token).set(tokenData);
+      deviceType
+    });
     
     console.log(`FCM 토큰이 저장되었습니다: ${userId}`);
-    return true;
+    return result.data.success;
   } catch (error) {
     console.error('FCM 토큰 저장 실패:', error);
     return false;
@@ -61,40 +62,15 @@ export const removeUserFCMToken = async (token: string) => {
  */
 export const sendFCMToUser = async (userId: string, notification: FCMNotificationPayload) => {
   try {
-    const { db } = await import('../firebaseConfig');
+    const sendToUser = httpsCallable(functions, 'sendFCMToUser');
     
-    // 사용자의 모든 FCM 토큰 조회
-    const tokensSnapshot = await db.collection('fcm_tokens')
-      .where('userId', '==', userId)
-      .get();
-
-    if (tokensSnapshot.empty) {
-      console.log(`사용자 ${userId}의 FCM 토큰을 찾을 수 없습니다.`);
-      return false;
-    }
-
-    const tokens = tokensSnapshot.docs.map(doc => doc.data() as FCMTokenData);
+    const result = await sendToUser({
+      userId,
+      notification
+    });
     
-    // 각 토큰에 대해 알림 전송 (실제로는 서버에서 FCM Admin SDK 사용)
-    for (const tokenData of tokens) {
-      console.log(`사용자 ${userId}에게 FCM 알림 전송:`, {
-        token: tokenData.token,
-        notification
-      });
-      
-      // 실제 프로덕션에서는 여기서 FCM Admin SDK를 사용하여 푸시 알림을 전송합니다
-      // await admin.messaging().send({
-      //   token: tokenData.token,
-      //   notification: {
-      //     title: notification.title,
-      //     body: notification.body,
-      //     icon: notification.icon || '/favicon.ico'
-      //   },
-      //   data: notification.data || {}
-      // });
-    }
-
-    return true;
+    console.log(`사용자 ${userId}에게 FCM 전송 결과:`, result.data);
+    return result.data.success;
   } catch (error) {
     console.error(`사용자 ${userId}에게 FCM 전송 실패:`, error);
     return false;
@@ -106,40 +82,14 @@ export const sendFCMToUser = async (userId: string, notification: FCMNotificatio
  */
 export const sendBroadcastFCM = async (notification: FCMNotificationPayload) => {
   try {
-    const { db } = await import('../firebaseConfig');
+    const sendBroadcast = httpsCallable(functions, 'sendBroadcastFCM');
     
-    // 모든 활성 FCM 토큰 조회
-    const tokensSnapshot = await db.collection('fcm_tokens')
-      .where('lastUsed', '>', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()) // 30일 이내 사용된 토큰만
-      .get();
-
-    if (tokensSnapshot.empty) {
-      console.log('활성 FCM 토큰을 찾을 수 없습니다.');
-      return false;
-    }
-
-    const tokens = tokensSnapshot.docs.map(doc => doc.data() as FCMTokenData);
+    const result = await sendBroadcast({
+      notification
+    });
     
-    // 각 토큰에 대해 알림 전송
-    for (const tokenData of tokens) {
-      console.log(`브로드캐스트 FCM 알림 전송:`, {
-        token: tokenData.token,
-        notification
-      });
-      
-      // 실제 프로덕션에서는 여기서 FCM Admin SDK를 사용하여 푸시 알림을 전송합니다
-      // await admin.messaging().send({
-      //   token: tokenData.token,
-      //   notification: {
-      //     title: notification.title,
-      //     body: notification.body,
-      //     icon: notification.icon || '/favicon.ico'
-      //   },
-      //   data: notification.data || {}
-      // });
-    }
-
-    return true;
+    console.log('브로드캐스트 FCM 전송 결과:', result.data);
+    return result.data.success;
   } catch (error) {
     console.error('브로드캐스트 FCM 전송 실패:', error);
     return false;

@@ -128,15 +128,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectCenter, onSearchSubmit,
                         </div>
                         
                         {/* FCM 권한 요청 섹션 */}
-                        {fcmSupported && onRequestFCMPermission && (
-                            <div className="border-t dark:border-slate-700 p-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-800 dark:text-white">푸시 알림</p>
-                                        <p className="text-xs text-gray-500 dark:text-slate-400">
-                                            {fcmError ? fcmError : '중요한 알림을 실시간으로 받아보세요'}
-                                        </p>
-                                    </div>
+                        <div className="border-t dark:border-slate-700 p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-800 dark:text-white">푸시 알림</p>
+                                    <p className="text-xs text-gray-500 dark:text-slate-400">
+                                        {!fcmSupported ? 'FCM을 지원하지 않는 브라우저입니다' :
+                                         fcmError ? fcmError : 
+                                         onRequestFCMPermission ? '중요한 알림을 실시간으로 받아보세요' : 'FCM 권한 요청 함수가 없습니다'}
+                                    </p>
+                                </div>
+                                {fcmSupported && onRequestFCMPermission && (
                                     <button
                                         onClick={async () => {
                                             const success = await onRequestFCMPermission();
@@ -148,9 +150,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectCenter, onSearchSubmit,
                                     >
                                         {fcmError ? '다시 시도' : '알림 허용'}
                                     </button>
-                                </div>
+                                )}
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
             )}

@@ -36,6 +36,7 @@ const SampleRequestForm: React.FC<SampleRequestFormProps> = ({ onSave, onCancel,
         existingRequest?.items ? existingRequest.items.map(item => ({...item, quantity: String(item.quantity)})) : [{ partName: '', colorSpec: '', quantity: '', postProcessing: [], coatingMethod: '' }]
     );
     const [imageFiles, setImageFiles] = useState<File[]>([]);
+    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -67,10 +68,72 @@ const SampleRequestForm: React.FC<SampleRequestFormProps> = ({ onSave, onCancel,
         setItems(items.filter((_, i) => i !== index));
     };
 
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const compressImage = (file: File, maxWidth: number = 1920, quality: number = 0.8): Promise<File> => {
+        return new Promise((resolve) => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            img.onload = () => {
+                // 원본 비율 유지하면서 크기 조정
+                const ratio = Math.min(maxWidth / img.width, maxWidth / img.height);
+                canvas.width = img.width * ratio;
+                canvas.height = img.height * ratio;
+                
+                // 이미지 그리기
+                ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                // 압축된 이미지를 Blob으로 변환
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const compressedFile = new File([blob], file.name, {
+                            type: 'image/jpeg',
+                            lastModified: Date.now(),
+                        });
+                        resolve(compressedFile);
+                    } else {
+                        resolve(file); // 압축 실패 시 원본 반환
+                    }
+                }, 'image/jpeg', quality);
+            };
+            
+            img.src = URL.createObjectURL(file);
+        });
+    };
+
+    const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            setImageFiles(Array.from(e.target.files));
+            const files = Array.from(e.target.files);
+            
+            // 이미지 압축
+            const compressedFiles = await Promise.all(
+                files.map(file => {
+                    // 이미지 파일만 압축 (5MB 이상인 경우)
+                    if (file.type.startsWith('image/') && file.size > 5 * 1024 * 1024) {
+                        return compressImage(file, 1920, 0.8);
+                    }
+                    return file;
+                })
+            );
+            
+            setImageFiles(compressedFiles);
+            
+            // 미리보기 생성
+            const previews = compressedFiles.map(file => {
+                return new Promise<string>((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target?.result as string);
+                    reader.readAsDataURL(file);
+                });
+            });
+            
+            Promise.all(previews).then(setImagePreviews);
         }
+    };
+    
+    const removeImage = (index: number) => {
+        setImageFiles(prev => prev.filter((_, i) => i !== index));
+        setImagePreviews(prev => prev.filter((_, i) => i !== index));
     };
     
     const handleSubmit = async (e: React.FormEvent) => {
@@ -112,7 +175,39 @@ const SampleRequestForm: React.FC<SampleRequestFormProps> = ({ onSave, onCancel,
                             <h3 className="text-lg font-semibold border-b pb-2 dark:border-slate-700">공통 사양</h3>
                             <div><label htmlFor="dueDate" className={labelClasses}>납기 요청일</label><input type="date" name="dueDate" value={formData.dueDate} onChange={handleChange} required className={inputClasses} /></div>
                             <div><label htmlFor="remarks" className={labelClasses}>비고</label><textarea name="remarks" value={formData.remarks} onChange={handleChange} rows={3} className={inputClasses} /></div>
-                            {!existingRequest && <div><label htmlFor="images" className={labelClasses}>참고 이미지</label><input type="file" name="images" onChange={handleImageChange} multiple accept="image/*" className={`${inputClasses} p-0 file:mr-4 file:py-2 file:px-4 file:rounded-l-md file:border-0 file:bg-slate-100 dark:file:bg-slate-600 file:cursor-pointer`} /></div>}
+                            {!existingRequest && (
+                                <div>
+                                    <label htmlFor="images" className={labelClasses}>참고 이미지</label>
+                                    <input type="file" name="images" onChange={handleImageChange} multiple accept="image/*" className={`${inputClasses} p-0 file:mr-4 file:py-2 file:px-4 file:rounded-l-md file:border-0 file:bg-slate-100 dark:file:bg-slate-600 file:cursor-pointer`} />
+                                    
+                                    {/* 이미지 미리보기 */}
+                                    {imagePreviews.length > 0 && (
+                                        <div className="mt-3">
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                                선택된 이미지 ({imagePreviews.length}개)
+                                            </p>
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                                {imagePreviews.map((preview, index) => (
+                                                    <div key={index} className="relative group">
+                                                        <img 
+                                                            src={preview} 
+                                                            alt={`미리보기 ${index + 1}`}
+                                                            className="w-full h-24 object-cover rounded-md border border-gray-200 dark:border-gray-600"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeImage(index)}
+                                                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 

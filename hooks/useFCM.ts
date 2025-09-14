@@ -49,13 +49,14 @@ export const useFCM = (): FCMHook => {
         return true;
       }
 
-      // 권한이 차단된 경우
+      // 권한이 차단된 경우 - 다시 시도 허용
       if (Notification.permission === 'denied') {
-        setError('알림 권한이 차단되었습니다. 브라우저 설정에서 알림을 허용해주세요.');
-        return false;
+        // 일부 브라우저에서는 거부된 후에도 다시 요청할 수 있음
+        console.log('알림 권한이 거부되었습니다. 다시 시도합니다...');
+        setError('알림 권한이 거부되었습니다. 다시 시도하거나 브라우저 설정에서 알림을 허용해주세요.');
       }
 
-      // 권한 요청
+      // 권한 요청 (거부된 경우에도 다시 시도)
       const permission = await Notification.requestPermission();
       
       if (permission === 'granted') {
