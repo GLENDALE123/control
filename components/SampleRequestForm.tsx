@@ -44,7 +44,7 @@ const SampleRequestForm: React.FC<SampleRequestFormProps> = ({ onSave, onCancel,
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
-
+    
     const handleItemChange = (index: number, field: keyof FormItem, value: string | string[]) => {
         const newItems = [...items];
         newItems[index] = { ...newItems[index], [field]: value };
@@ -181,40 +181,8 @@ const SampleRequestForm: React.FC<SampleRequestFormProps> = ({ onSave, onCancel,
                             <div><label htmlFor="dueDate" className={labelClasses}>납기 요청일</label><input type="date" name="dueDate" value={formData.dueDate} onChange={handleChange} required className={inputClasses} /></div>
                             <div><label htmlFor="remarks" className={labelClasses}>비고</label><textarea name="remarks" value={formData.remarks} onChange={handleChange} rows={3} className={inputClasses} /></div>
                             <div>
-                                <label className={labelClasses}>참고 이미지</label>
-                                <div className="flex gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => document.getElementById('images-gallery')?.click()}
-                                        className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors"
-                                    >
-                                        📁 갤러리에서 선택
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => document.getElementById('images-camera')?.click()}
-                                        className="flex-1 bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors"
-                                    >
-                                        📷 카메라로 촬영
-                                    </button>
-                                </div>
-                                <input 
-                                    id="images-gallery" 
-                                    type="file" 
-                                    onChange={handleImageChange} 
-                                    multiple 
-                                    accept="image/*" 
-                                    className="hidden" 
-                                />
-                                <input 
-                                    id="images-camera" 
-                                    type="file" 
-                                    onChange={handleImageChange} 
-                                    multiple 
-                                    accept="image/*" 
-                                    capture="environment"
-                                    className="hidden" 
-                                />
+                                <label htmlFor="images" className={labelClasses}>참고 이미지</label>
+                                <input type="file" name="images" onChange={handleImageChange} multiple accept="image/*" className={`${inputClasses} p-0 file:mr-4 file:py-2 file:px-4 file:rounded-l-md file:border-0 file:bg-slate-100 dark:file:bg-slate-600 file:cursor-pointer`} />
                                 
                                 {/* 기존 이미지 */}
                                 {existingImages.length > 0 && (
@@ -292,12 +260,12 @@ const SampleRequestForm: React.FC<SampleRequestFormProps> = ({ onSave, onCancel,
                                 </div>
                             </div>
                         ))}
-                        <button type="button" onClick={addItem} className="w-full mt-2 py-2 border-2 border-dashed rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50">품목 추가</button>
-                    </div>
+                         <button type="button" onClick={addItem} className="w-full mt-2 py-2 border-2 border-dashed rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50">품목 추가</button>
+            </div>
 
-                    <div className="flex-shrink-0 flex justify-end gap-4 p-4 border-t dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
-                        <button type="button" onClick={onCancel} className="bg-gray-200 dark:bg-slate-600 px-6 py-2 rounded-lg">취소</button>
-                        <button type="submit" form="sample-request-form" disabled={isSaving} className="bg-primary-600 text-white px-6 py-2 rounded-lg disabled:opacity-50">{isSaving ? '저장 중...' : '요청 제출'}</button>
+            <div className="flex-shrink-0 flex justify-end gap-4 p-4 border-t dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+                <button type="button" onClick={onCancel} className="bg-gray-200 dark:bg-slate-600 px-6 py-2 rounded-lg">취소</button>
+                <button type="submit" form="sample-request-form" disabled={isSaving} className="bg-primary-600 text-white px-6 py-2 rounded-lg disabled:opacity-50">{isSaving ? '저장 중...' : '요청 제출'}</button>
                     </div>
                 </form>
             </div>
