@@ -1118,7 +1118,8 @@ const App: React.FC = () => {
 
   const handleSaveSampleRequest = useCallback(async (
     data: Omit<SampleRequest, 'id' | 'createdAt' | 'requesterInfo' | 'status' | 'history' | 'comments' | 'imageUrls' | 'workData'>,
-    images: File[]
+    images: File[],
+    existingImages?: string[]
   ) => {
     if (!currentUserProfile) {
         addToast({ message: "로그인이 필요합니다.", type: "error" });
@@ -1137,8 +1138,34 @@ const App: React.FC = () => {
                 user: currentUserProfile.displayName,
                 reason: '요청 내용 수정됨'
             };
+            // 기존 이미지와 새 이미지 처리
+            let finalImageUrls = existingImages || editingRequest.imageUrls || [];
+            
+            // 새로 추가할 이미지 업로드
+            if (images.length > 0) {
+                try {
+                    addToast({ message: "새 이미지 업로드 중...", type: 'info' });
+                    const newImageUrls = await Promise.all(
+                        images.map(file => {
+                            const ref = storage.ref(`sample-request-images/${editingRequest.id}/${Date.now()}-${file.name}`);
+                            const metadata = {
+                                contentType: file.type || 'image/jpeg',
+                                cacheControl: 'public,max-age=31536000',
+                            };
+                            return ref.put(file, metadata).then(snapshot => snapshot.ref.getDownloadURL());
+                        })
+                    );
+                    finalImageUrls = [...finalImageUrls, ...newImageUrls];
+                } catch (imageError) {
+                    console.error("새 이미지 업로드 실패:", imageError);
+                    addToast({ message: "새 이미지 업로드에 실패했습니다.", type: "error" });
+                    throw imageError;
+                }
+            }
+            
             await requestRef.update({
                 ...data,
+                imageUrls: finalImageUrls,
                 history: firebase.firestore.FieldValue.arrayUnion(historyEntry)
             });
             addToast({ message: "샘플 요청이 수정되었습니다.", type: 'success' });
@@ -1282,11 +1309,32 @@ const App: React.FC = () => {
     const handleDeleteSampleRequest = useCallback(async (id: string) => {
         addToast({ message: "삭제 중...", type: 'info' });
         try {
+            // 먼저 요청 데이터를 가져와서 이미지 URL 확인
+            const requestDoc = await db.collection('sample-requests').doc(id).get();
+            const requestData = requestDoc.data();
+            
+            // DB에서 요청 삭제
             await db.collection('sample-requests').doc(id).delete();
-            // Note: Images in storage are not deleted to preserve record, can be changed.
-            addToast({ message: '요청이 삭제되었습니다.', type: 'success' });
+            
+            // Firebase Storage에서 이미지들 삭제
+            if (requestData?.imageUrls && Array.isArray(requestData.imageUrls)) {
+                const deletePromises = requestData.imageUrls.map((imageUrl: string) => {
+                    try {
+                        const imageRef = storage.refFromURL(imageUrl);
+                        return imageRef.delete();
+                    } catch (error) {
+                        console.warn('이미지 삭제 실패:', imageUrl, error);
+                        return Promise.resolve(); // 개별 이미지 삭제 실패는 무시
+                    }
+                });
+                
+                await Promise.all(deletePromises);
+            }
+            
+            addToast({ message: '요청과 이미지가 삭제되었습니다.', type: 'success' });
             handleCloseModal();
         } catch (error) {
+            console.error('삭제 중 오류:', error);
             addToast({ message: '삭제에 실패했습니다.', type: 'error' });
         }
     }, [addToast, handleCloseModal]);

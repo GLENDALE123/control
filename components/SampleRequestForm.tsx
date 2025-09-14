@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { SampleRequest, SampleRequestItem } from '../types';
 
 interface SampleRequestFormProps {
-  onSave: (data: Omit<SampleRequest, 'id' | 'createdAt' | 'requesterInfo' | 'status' | 'history' | 'comments' | 'imageUrls' | 'workData'>, images: File[]) => Promise<void>;
+  onSave: (data: Omit<SampleRequest, 'id' | 'createdAt' | 'requesterInfo' | 'status' | 'history' | 'comments' | 'imageUrls' | 'workData'>, images: File[], existingImages?: string[]) => Promise<void>;
   onCancel: () => void;
   existingRequest?: SampleRequest | null;
   addToast: (toast: { message: string; type: 'success' | 'error' | 'info' }) => void;
@@ -24,12 +24,12 @@ const SampleRequestForm: React.FC<SampleRequestFormProps> = ({ onSave, onCancel,
     };
     
     const [formData, setFormData] = useState({
-        clientName: existingRequest?.clientName || '',
-        productName: existingRequest?.productName || '',
-        dueDate: existingRequest?.dueDate || '',
-        remarks: existingRequest?.remarks || '',
         requestDate: existingRequest?.requestDate || getLocalDate(),
         requesterName: existingRequest?.requesterName || '',
+        clientName: existingRequest?.clientName || '',
+        productName: existingRequest?.productName || '',
+        dueDate: existingRequest?.dueDate || getLocalDate(),
+        remarks: existingRequest?.remarks || '',
         contact: existingRequest?.contact || '',
     });
     const [items, setItems] = useState<FormItem[]>(
@@ -37,14 +37,15 @@ const SampleRequestForm: React.FC<SampleRequestFormProps> = ({ onSave, onCancel,
     );
     const [imageFiles, setImageFiles] = useState<File[]>([]);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    const [existingImages, setExistingImages] = useState<string[]>(existingRequest?.imageUrls || []);
     const [isSaving, setIsSaving] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
-    
-    const handleItemChange = (index: number, field: keyof Omit<FormItem, 'postProcessing'>, value: string) => {
+
+    const handleItemChange = (index: number, field: keyof FormItem, value: string | string[]) => {
         const newItems = [...items];
         newItems[index] = { ...newItems[index], [field]: value };
         setItems(newItems);
@@ -68,7 +69,7 @@ const SampleRequestForm: React.FC<SampleRequestFormProps> = ({ onSave, onCancel,
         setItems(items.filter((_, i) => i !== index));
     };
 
-    const compressImage = (file: File, maxWidth: number = 1920, quality: number = 0.8): Promise<File> => {
+    const compressImage = (file: File, maxWidth: number = 1280, quality: number = 0.85): Promise<File> => {
         return new Promise((resolve) => {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -105,12 +106,12 @@ const SampleRequestForm: React.FC<SampleRequestFormProps> = ({ onSave, onCancel,
         if (e.target.files) {
             const files = Array.from(e.target.files);
             
-            // 이미지 압축
+            // 이미지 압축 (모든 이미지 파일에 대해)
             const compressedFiles = await Promise.all(
                 files.map(file => {
-                    // 이미지 파일만 압축 (5MB 이상인 경우)
-                    if (file.type.startsWith('image/') && file.size > 5 * 1024 * 1024) {
-                        return compressImage(file, 1920, 0.8);
+                    // 이미지 파일은 모두 압축
+                    if (file.type.startsWith('image/')) {
+                        return compressImage(file, 1280, 0.85);
                     }
                     return file;
                 })
@@ -136,6 +137,10 @@ const SampleRequestForm: React.FC<SampleRequestFormProps> = ({ onSave, onCancel,
         setImagePreviews(prev => prev.filter((_, i) => i !== index));
     };
     
+    const removeExistingImage = (index: number) => {
+        setExistingImages(prev => prev.filter((_, i) => i !== index));
+    };
+    
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
@@ -152,7 +157,7 @@ const SampleRequestForm: React.FC<SampleRequestFormProps> = ({ onSave, onCancel,
                 setIsSaving(false);
                 return;
             }
-            await onSave(dataToSave, imageFiles);
+            await onSave(dataToSave, imageFiles, existingImages);
         } catch (error) {
             setIsSaving(false);
         }
@@ -175,39 +180,64 @@ const SampleRequestForm: React.FC<SampleRequestFormProps> = ({ onSave, onCancel,
                             <h3 className="text-lg font-semibold border-b pb-2 dark:border-slate-700">공통 사양</h3>
                             <div><label htmlFor="dueDate" className={labelClasses}>납기 요청일</label><input type="date" name="dueDate" value={formData.dueDate} onChange={handleChange} required className={inputClasses} /></div>
                             <div><label htmlFor="remarks" className={labelClasses}>비고</label><textarea name="remarks" value={formData.remarks} onChange={handleChange} rows={3} className={inputClasses} /></div>
-                            {!existingRequest && (
-                                <div>
-                                    <label htmlFor="images" className={labelClasses}>참고 이미지</label>
-                                    <input type="file" name="images" onChange={handleImageChange} multiple accept="image/*" className={`${inputClasses} p-0 file:mr-4 file:py-2 file:px-4 file:rounded-l-md file:border-0 file:bg-slate-100 dark:file:bg-slate-600 file:cursor-pointer`} />
-                                    
-                                    {/* 이미지 미리보기 */}
-                                    {imagePreviews.length > 0 && (
-                                        <div className="mt-3">
-                                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                                                선택된 이미지 ({imagePreviews.length}개)
-                                            </p>
-                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                                {imagePreviews.map((preview, index) => (
-                                                    <div key={index} className="relative group">
-                                                        <img 
-                                                            src={preview} 
-                                                            alt={`미리보기 ${index + 1}`}
-                                                            className="w-full h-24 object-cover rounded-md border border-gray-200 dark:border-gray-600"
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeImage(index)}
-                                                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        >
-                                                            ×
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
+                            <div>
+                                <label htmlFor="images" className={labelClasses}>참고 이미지</label>
+                                <input type="file" name="images" onChange={handleImageChange} multiple accept="image/*" className={`${inputClasses} p-0 file:mr-4 file:py-2 file:px-4 file:rounded-l-md file:border-0 file:bg-slate-100 dark:file:bg-slate-600 file:cursor-pointer`} />
+                                
+                                {/* 기존 이미지 */}
+                                {existingImages.length > 0 && (
+                                    <div className="mt-3">
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                            기존 이미지 ({existingImages.length}개)
+                                        </p>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                            {existingImages.map((imageUrl, index) => (
+                                                <div key={`existing-${index}`} className="relative group">
+                                                    <img 
+                                                        src={imageUrl} 
+                                                        alt={`기존 이미지 ${index + 1}`}
+                                                        className="w-full h-24 object-cover rounded-md border border-gray-200 dark:border-gray-600"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeExistingImage(index)}
+                                                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </div>
+                                            ))}
                                         </div>
-                                    )}
-                                </div>
-                            )}
+                                    </div>
+                                )}
+                                
+                                {/* 새로 추가할 이미지 미리보기 */}
+                                {imagePreviews.length > 0 && (
+                                    <div className="mt-3">
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                            새로 추가할 이미지 ({imagePreviews.length}개)
+                                        </p>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                            {imagePreviews.map((preview, index) => (
+                                                <div key={`new-${index}`} className="relative group">
+                                                    <img 
+                                                        src={preview} 
+                                                        alt={`미리보기 ${index + 1}`}
+                                                        className="w-full h-24 object-cover rounded-md border border-gray-200 dark:border-gray-600"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeImage(index)}
+                                                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -230,14 +260,14 @@ const SampleRequestForm: React.FC<SampleRequestFormProps> = ({ onSave, onCancel,
                                 </div>
                             </div>
                         ))}
-                         <button type="button" onClick={addItem} className="w-full mt-2 py-2 border-2 border-dashed rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50">품목 추가</button>
+                        <button type="button" onClick={addItem} className="w-full mt-2 py-2 border-2 border-dashed rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50">품목 추가</button>
+                    </div>
+
+                    <div className="flex-shrink-0 flex justify-end gap-4 p-4 border-t dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+                        <button type="button" onClick={onCancel} className="bg-gray-200 dark:bg-slate-600 px-6 py-2 rounded-lg">취소</button>
+                        <button type="submit" form="sample-request-form" disabled={isSaving} className="bg-primary-600 text-white px-6 py-2 rounded-lg disabled:opacity-50">{isSaving ? '저장 중...' : '요청 제출'}</button>
                     </div>
                 </form>
-            </div>
-
-            <div className="flex-shrink-0 flex justify-end gap-4 p-4 border-t dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
-                <button type="button" onClick={onCancel} className="bg-gray-200 dark:bg-slate-600 px-6 py-2 rounded-lg">취소</button>
-                <button type="submit" form="sample-request-form" disabled={isSaving} className="bg-primary-600 text-white px-6 py-2 rounded-lg disabled:opacity-50">{isSaving ? '저장 중...' : '요청 제출'}</button>
             </div>
         </div>
     );
