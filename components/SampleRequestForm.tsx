@@ -182,7 +182,7 @@ const SampleRequestForm: React.FC<SampleRequestFormProps> = ({ onSave, onCancel,
                             <div><label htmlFor="remarks" className={labelClasses}>비고</label><textarea name="remarks" value={formData.remarks} onChange={handleChange} rows={3} className={inputClasses} /></div>
                             <div>
                                 <label htmlFor="images" className={labelClasses}>참고 이미지</label>
-                                <input type="file" name="images" onChange={handleImageChange} multiple accept="image/*" capture className={`${inputClasses} p-0 file:mr-4 file:py-2 file:px-4 file:rounded-l-md file:border-0 file:bg-slate-100 dark:file:bg-slate-600 file:cursor-pointer`} />
+                                <input type="file" name="images" onChange={handleImageChange} multiple accept="image/jpeg,image/png,image/webp,image/gif" className={`${inputClasses} p-0 file:mr-4 file:py-2 file:px-4 file:rounded-l-md file:border-0 file:bg-slate-100 dark:file:bg-slate-600 file:cursor-pointer`} />
                                 
                                 {/* 기존 이미지 */}
                                 {existingImages.length > 0 && (
