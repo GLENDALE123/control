@@ -64,7 +64,6 @@ const SampleRequestDetail: React.FC<SampleRequestDetailProps> = ({ request, curr
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const [workData, setWorkData] = useState<NonNullable<SampleRequest['workData']>>(request.workData || {});
     const [actionModalState, setActionModalState] = useState<{ open: boolean; status: SampleStatus.OnHold | SampleStatus.Rejected | null }>({ open: false, status: null });
     const [isWorkDataVisible, setIsWorkDataVisible] = useState(false);
@@ -233,11 +232,17 @@ const SampleRequestDetail: React.FC<SampleRequestDetailProps> = ({ request, curr
                         <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
                             {request.imageUrls.map((url, i) => <img key={i} src={url} alt={`sample-${i}`} className="w-full h-24 object-cover rounded-md cursor-pointer" onClick={() => setLightboxImage(url)} />)}
                             {canManage && (
-                                <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="w-full h-24 border-2 border-dashed rounded-md flex flex-col items-center justify-center text-gray-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 disabled:opacity-50">
-                                    {isUploading ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div> : <><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg><span className="text-xs mt-1">이미지 업로드</span></>}
-                                </button>
+                                <>
+                                    <button onClick={() => document.getElementById('gallery-upload')?.click()} disabled={isUploading} className="w-full h-24 border-2 border-dashed rounded-md flex flex-col items-center justify-center text-gray-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 disabled:opacity-50">
+                                        {isUploading ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div> : <><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg><span className="text-xs mt-1">📁 갤러리</span></>}
+                                    </button>
+                                    <button onClick={() => document.getElementById('camera-upload')?.click()} disabled={isUploading} className="w-full h-24 border-2 border-dashed rounded-md flex flex-col items-center justify-center text-gray-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 disabled:opacity-50">
+                                        {isUploading ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div> : <><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg><span className="text-xs mt-1">📷 카메라</span></>}
+                                    </button>
+                                </>
                             )}
-                            <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+                            <input id="gallery-upload" type="file" onChange={handleImageUpload} accept="image/*" className="hidden" />
+                            <input id="camera-upload" type="file" onChange={handleImageUpload} accept="image/*" capture="environment" className="hidden" />
                         </div>
                     </div>
                 </div>

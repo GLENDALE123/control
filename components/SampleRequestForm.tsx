@@ -181,8 +181,40 @@ const SampleRequestForm: React.FC<SampleRequestFormProps> = ({ onSave, onCancel,
                             <div><label htmlFor="dueDate" className={labelClasses}>납기 요청일</label><input type="date" name="dueDate" value={formData.dueDate} onChange={handleChange} required className={inputClasses} /></div>
                             <div><label htmlFor="remarks" className={labelClasses}>비고</label><textarea name="remarks" value={formData.remarks} onChange={handleChange} rows={3} className={inputClasses} /></div>
                             <div>
-                                <label htmlFor="images" className={labelClasses}>참고 이미지</label>
-                                <input type="file" name="images" onChange={handleImageChange} multiple accept="image/*" className={`${inputClasses} p-0 file:mr-4 file:py-2 file:px-4 file:rounded-l-md file:border-0 file:bg-slate-100 dark:file:bg-slate-600 file:cursor-pointer`} />
+                                <label className={labelClasses}>참고 이미지</label>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => document.getElementById('images-gallery')?.click()}
+                                        className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors"
+                                    >
+                                        📁 갤러리에서 선택
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => document.getElementById('images-camera')?.click()}
+                                        className="flex-1 bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors"
+                                    >
+                                        📷 카메라로 촬영
+                                    </button>
+                                </div>
+                                <input 
+                                    id="images-gallery" 
+                                    type="file" 
+                                    onChange={handleImageChange} 
+                                    multiple 
+                                    accept="image/*" 
+                                    className="hidden" 
+                                />
+                                <input 
+                                    id="images-camera" 
+                                    type="file" 
+                                    onChange={handleImageChange} 
+                                    multiple 
+                                    accept="image/*" 
+                                    capture="environment"
+                                    className="hidden" 
+                                />
                                 
                                 {/* 기존 이미지 */}
                                 {existingImages.length > 0 && (
