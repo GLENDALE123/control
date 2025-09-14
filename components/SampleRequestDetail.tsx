@@ -237,7 +237,7 @@ const SampleRequestDetail: React.FC<SampleRequestDetailProps> = ({ request, curr
                                     {isUploading ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div> : <><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg><span className="text-xs mt-1">이미지 업로드</span></>}
                                 </button>
                             )}
-                            <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" />
+                            <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
                         </div>
                     </div>
                 </div>
