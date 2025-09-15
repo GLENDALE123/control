@@ -59,6 +59,34 @@ const JigRegistrationForm: React.FC<JigRegistrationFormProps> = ({ isOpen, onSav
     itemNumber: '',
     remarks: ''
   });
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Cleanup object URLs to avoid memory leaks
+    return () => {
+      imagePreviews.forEach(preview => URL.revokeObjectURL(preview));
+    };
+  }, [imagePreviews]);
+
+  const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      const newPreviews = files.map(file => URL.createObjectURL(file));
+      setImageFiles(prev => [...prev, ...files]);
+      setImagePreviews(prev => [...prev, ...newPreviews]);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => {
+      URL.revokeObjectURL(prev[index]);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
   
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -67,7 +95,7 @@ const JigRegistrationForm: React.FC<JigRegistrationFormProps> = ({ isOpen, onSav
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    onSave(formData, []);
+    onSave(formData, imageFiles);
   };
   
   if (!isOpen) return null;
@@ -78,12 +106,33 @@ const JigRegistrationForm: React.FC<JigRegistrationFormProps> = ({ isOpen, onSav
     <div className="h-full flex flex-col">
         <form onSubmit={handleSubmit} className="space-y-6 overflow-y-auto flex-1 p-4 sm:p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4 md:col-span-2">
+                <div className="space-y-4">
                     <SelectField label="생산구분" name="requestType" value={formData.requestType} onChange={handleChange} options={productionTypes} required />
                     <InputField label="제품명" name="itemName" value={formData.itemName} onChange={handleChange} required suggestions={autocompleteData.itemNames} />
                     <InputField label="부속명" name="partName" value={formData.partName} onChange={handleChange} suggestions={autocompleteData.partNames} />
                     <InputField label="지그번호" name="itemNumber" value={formData.itemNumber} onChange={handleChange} suggestions={autocompleteData.itemNumbers} />
                     <TextareaField label="특이사항" name="remarks" value={formData.remarks} onChange={handleChange} rows={5} />
+                </div>
+                <div className="space-y-4">
+                     <div>
+                        <label className={labelClasses}>이미지 첨부</label>
+                        <div className="mt-1 flex items-center gap-2">
+                            <input type="file" ref={fileInputRef} onChange={handleImageChange} multiple accept="image/*" className="hidden" />
+                            <input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*" capture="environment" className="hidden" />
+                            <button type="button" onClick={() => fileInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold border rounded-md hover:bg-slate-50 dark:hover:bg-slate-600">파일 선택</button>
+                            <button type="button" onClick={() => cameraInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold border rounded-md hover:bg-slate-50 dark:hover:bg-slate-600">사진 촬영</button>
+                        </div>
+                        {imagePreviews.length > 0 && (
+                            <div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
+                                {imagePreviews.map((preview, index) => (
+                                    <div key={index} className="relative">
+                                        <img src={preview} alt={`preview ${index}`} className="w-full h-24 object-cover rounded" />
+                                        <button type="button" onClick={() => removeImage(index)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">&times;</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </form>

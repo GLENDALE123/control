@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { db } from '../firebaseConfig';
+
+import React, { useState, useEffect, useRef, useMemo, ChangeEvent } from 'react';
+import { db, storage } from '../firebaseConfig';
 import { QualityIssue, UserProfile } from '../types';
 import FullScreenModal from './FullScreenModal';
 import ConfirmationModal from './ConfirmationModal';
@@ -17,7 +18,7 @@ const defectKeywordOptions = ['가스', '기름', '기포', '기능불량', '내
 
 
 const QualityIssueForm: React.FC<{
-    onSave: (data: Omit<QualityIssue, 'id' | 'createdAt' | 'author'>) => void,
+    onSave: (data: Omit<QualityIssue, 'id' | 'createdAt' | 'author' | 'imageUrls'>, imageFiles: File[]) => void,
     onCancel: () => void,
     isSaving: boolean,
 }> = ({ onSave, onCancel, isSaving }) => {
@@ -29,6 +30,33 @@ const QualityIssueForm: React.FC<{
     });
     const [issues, setIssues] = useState(['']);
     const [keywordPairs, setKeywordPairs] = useState([{ process: '', defect: '' }]);
+    const [imageFiles, setImageFiles] = useState<File[]>([]);
+    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const cameraInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        return () => {
+            imagePreviews.forEach(preview => URL.revokeObjectURL(preview));
+        };
+    }, [imagePreviews]);
+
+    const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const files = Array.from(e.target.files);
+            const newPreviews = files.map(file => URL.createObjectURL(file));
+            setImageFiles(prev => [...prev, ...files]);
+            setImagePreviews(prev => [...prev, ...newPreviews]);
+        }
+    };
+
+    const removeImage = (index: number) => {
+        setImageFiles(prev => prev.filter((_, i) => i !== index));
+        setImagePreviews(prev => {
+            URL.revokeObjectURL(prev[index]);
+            return prev.filter((_, i) => i !== index);
+        });
+    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -60,7 +88,12 @@ const QualityIssueForm: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave({ ...formData, issues: issues.filter(issue => issue.trim() !== ''), keywordPairs: keywordPairs.filter(p => p.process || p.defect) });
+        const finalIssues = issues.filter(issue => issue.trim() !== '');
+        if(finalIssues.length === 0) {
+            alert('최소 하나 이상의 이슈사항을 입력해야 합니다.');
+            return;
+        }
+        onSave({ ...formData, issues: finalIssues, keywordPairs: keywordPairs.filter(p => p.process || p.defect) }, imageFiles);
     };
 
     const inputClasses = "mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-200";
@@ -120,6 +153,25 @@ const QualityIssueForm: React.FC<{
                     </div>
                 ))}
                 <button type="button" onClick={addIssueField} className="mt-2 w-full py-2 border border-dashed border-gray-400 dark:border-slate-500 rounded-md text-sm hover:bg-slate-100 dark:hover:bg-slate-700">이슈사항 추가하기</button>
+            </div>
+             <div>
+                <label className={labelClasses}>이미지 첨부</label>
+                <div className="mt-1 flex items-center gap-2">
+                    <input type="file" ref={fileInputRef} onChange={handleImageChange} multiple accept="image/*" className="hidden" />
+                    <input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*" capture="environment" className="hidden" />
+                    <button type="button" onClick={() => fileInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold border rounded-md hover:bg-slate-50 dark:hover:bg-slate-600">파일 선택</button>
+                    <button type="button" onClick={() => cameraInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold border rounded-md hover:bg-slate-50 dark:hover:bg-slate-600">사진 촬영</button>
+                </div>
+                {imagePreviews.length > 0 && (
+                    <div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
+                        {imagePreviews.map((preview, index) => (
+                            <div key={index} className="relative">
+                                <img src={preview} alt={`preview ${index}`} className="w-full h-24 object-cover rounded" />
+                                <button type="button" onClick={() => removeImage(index)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">&times;</button>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
             <div className="flex justify-end gap-2 pt-4">
                 <button type="button" onClick={onCancel} className="bg-gray-200 dark:bg-slate-600 px-4 py-2 rounded-lg">취소</button>
@@ -309,19 +361,31 @@ const QualityIssueCenter: React.FC<QualityIssueCenterProps> = ({ currentUserProf
         );
     }, [issues, searchTerm]);
 
-    const handleSave = async (data: Omit<QualityIssue, 'id' | 'createdAt' | 'author'>) => {
+    const handleSave = async (data: Omit<QualityIssue, 'id' | 'createdAt' | 'author' | 'imageUrls'>, imageFiles: File[]) => {
         if (!currentUserProfile) {
             addToast({ message: '로그인이 필요합니다.', type: 'error' });
             return;
         }
         setIsSaving(true);
         try {
-            const newIssue = {
+            const newIssuePayload: Omit<QualityIssue, 'id'> = {
                 ...data,
                 author: currentUserProfile.displayName,
                 createdAt: new Date().toISOString(),
+                imageUrls: [],
             };
-            await db.collection('quality-issues').add(newIssue);
+            const newDocRef = await db.collection('quality-issues').add(newIssuePayload);
+            
+            if (imageFiles.length > 0) {
+                const imageUrls = await Promise.all(
+                    imageFiles.map(file => {
+                        const ref = storage.ref(`quality-issue-images/${newDocRef.id}/${Date.now()}-${file.name}`);
+                        return ref.put(file).then(snapshot => snapshot.ref.getDownloadURL());
+                    })
+                );
+                await newDocRef.update({ imageUrls });
+            }
+
             addToast({ message: '품질 이슈가 등록되었습니다.', type: 'success' });
             setIsFormModalOpen(false);
         } catch (error) {

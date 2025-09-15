@@ -1,4 +1,3 @@
-
 import React, { useState, ChangeEvent, FormEvent, useEffect, useMemo, useRef } from 'react';
 import { JigRequest, MasterData } from '../types';
 

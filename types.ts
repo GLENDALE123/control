@@ -131,6 +131,7 @@ export interface ProductionRequest {
   content: string; // 요청 내용
   history: HistoryEntry[];
   comments?: Comment[];
+  imageUrls?: string[];
 }
 
 export interface ProductionSchedule {
@@ -381,6 +382,7 @@ export interface QualityIssue {
   createdAt: string;
   author: string;
   keywordPairs?: KeywordPair[];
+  imageUrls?: string[];
 }
 
 export interface PackagedBox {
@@ -419,6 +421,7 @@ export interface PackagingReport {
     remainder?: number;
     packagedBoxes: PackagedBox[];
     memo?: string;
+    imageUrls?: string[];
 }
 
 export interface ShortageRequest {

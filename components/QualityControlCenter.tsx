@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+
+import React, { useState, useMemo, useEffect, useRef, useCallback, ChangeEvent } from 'react';
 import QualityNavigation from './QualityNavigation';
 import { UserProfile, QualityInspection, InspectionType, HistoryEntry, Comment, Status, GroupedInspectionData, InspectionResult, WorkerResult, DefectReason, WorkerInspectionData, KeywordPair, TestResultDetail, ProcessLineData, ReliabilityReview } from '../types';
-import { db } from '../firebaseConfig';
+import { db, storage } from '../firebaseConfig';
 import FullScreenModal from './FullScreenModal';
 import ConfirmationModal from './ConfirmationModal';
 import CommentsSection from './CommentsSection';
@@ -9,6 +10,8 @@ import { STATUS_COLORS } from '../constants';
 import QualityDashboard from './QualityDashboard';
 import TeamManagement from './TeamManagement';
 import QualityIssueCenter from './QualityIssueCenter';
+import ImageLightbox from './ImageLightbox';
+
 
 declare const html2canvas: any;
 
@@ -250,7 +253,7 @@ const DetailSection: React.FC<{ title: string; data?: string | null | React.Reac
     );
 };
 
-const InspectionDetailsList: React.FC<{ inspection: QualityInspection }> = ({ inspection }) => {
+const InspectionDetailsList: React.FC<{ inspection: QualityInspection; onImageClick: (url: string) => void; }> = ({ inspection, onImageClick }) => {
     const renderStructuredResult = (title: string, data?: TestResultDetail | string | null) => {
         if (!data) return null;
         let content;
@@ -291,6 +294,23 @@ const InspectionDetailsList: React.FC<{ inspection: QualityInspection }> = ({ in
             <DetailSection title="검사자" data={inspection.inspector} />
             <DetailSection title="검사일시" data={inspection.inspectionDate || new Date(inspection.createdAt).toLocaleString('ko-KR')} />
             <DetailSection title="관련 발주번호" data={inspection.relatedOrderNumbers?.join(', ')} />
+
+            {inspection.imageUrls && inspection.imageUrls.length > 0 && (
+                <div className="sm:col-span-2">
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">첨부 이미지</dt>
+                    <dd className="mt-1 grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
+                        {inspection.imageUrls.map((url, index) => (
+                            <img
+                                key={index}
+                                src={url}
+                                alt={`Inspection image ${index + 1}`}
+                                className="w-full h-24 object-cover rounded-md cursor-pointer transition-transform hover:scale-105"
+                                onClick={() => onImageClick(url)}
+                            />
+                        ))}
+                    </dd>
+                </div>
+            )}
 
             {inspection.inspectionType === 'incoming' && (
                 <>
@@ -421,7 +441,7 @@ const InspectionDetailsList: React.FC<{ inspection: QualityInspection }> = ({ in
     );
 };
 
-const InspectionSection: React.FC<{ title: string; inspections: QualityInspection[] | null; onEdit: (inspection: QualityInspection) => void; canManage: boolean; onAddNew: () => void; }> = ({ title, inspections, onEdit, canManage, onAddNew }) => (
+const InspectionSection: React.FC<{ title: string; inspections: QualityInspection[] | null; onEdit: (inspection: QualityInspection) => void; canManage: boolean; onAddNew: () => void; onImageClick: (url: string) => void; }> = ({ title, inspections, onEdit, canManage, onAddNew, onImageClick }) => (
     <div className="py-5 border-b border-gray-200 dark:border-slate-700 last:border-b-0">
         <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg leading-6 font-semibold text-gray-800 dark:text-white">{title} ({inspections?.length || 0}건)</h3>
@@ -443,7 +463,7 @@ const InspectionSection: React.FC<{ title: string; inspections: QualityInspectio
                                 <button onClick={() => onEdit(inspection)} className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">수정</button>
                             )}
                         </div>
-                        <InspectionDetailsList inspection={inspection} />
+                        <InspectionDetailsList inspection={inspection} onImageClick={onImageClick} />
                     </div>
                 ))}
             </div>
@@ -467,7 +487,8 @@ const InspectionDetailModal: React.FC<{
     const detailContentRef = useRef<HTMLDivElement>(null);
     const canManage = currentUserProfile?.role === 'Admin' || currentUserProfile?.role === 'Manager';
     const isAdmin = currentUserProfile?.role === 'Admin';
-    
+    const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+
     if (!details.common) {
         return (
             <FullScreenModal isOpen={true} onClose={onClose} title="데이터 오류">
@@ -569,9 +590,9 @@ const InspectionDetailModal: React.FC<{
                     </div>
 
                     <div className="mt-4">
-                        <InspectionSection title="수입검사" inspections={incoming} onEdit={onEdit} canManage={canManage} onAddNew={() => handleAddNew('incoming')} />
-                        <InspectionSection title="공정검사" inspections={inProcess} onEdit={onEdit} canManage={canManage} onAddNew={() => handleAddNew('inProcess')} />
-                        <InspectionSection title="출하검사" inspections={outgoing} onEdit={onEdit} canManage={canManage} onAddNew={() => handleAddNew('outgoing')} />
+                        <InspectionSection title="수입검사" inspections={incoming} onEdit={onEdit} canManage={canManage} onAddNew={() => handleAddNew('incoming')} onImageClick={setLightboxImage} />
+                        <InspectionSection title="공정검사" inspections={inProcess} onEdit={onEdit} canManage={canManage} onAddNew={() => handleAddNew('inProcess')} onImageClick={setLightboxImage}/>
+                        <InspectionSection title="출하검사" inspections={outgoing} onEdit={onEdit} canManage={canManage} onAddNew={() => handleAddNew('outgoing')} onImageClick={setLightboxImage}/>
                     </div>
                     
                     {/* 처리 이력 */}
@@ -590,7 +611,6 @@ const InspectionDetailModal: React.FC<{
                     </div>
 
                     {/* 댓글 */}
-                    {/* FIX: Changed prop 'canManage' to 'canComment' to match the component's props interface. */}
                     <CommentsSection comments={comments || []} onAddComment={(text) => onAddComment(details.orderNumber, text)} canComment={canManage} />
                     
                     {/* 액션 버튼 */}
@@ -604,6 +624,7 @@ const InspectionDetailModal: React.FC<{
                     </div>
                 </div>
             </FullScreenModal>
+            {lightboxImage && <ImageLightbox imageUrl={lightboxImage} onClose={() => setLightboxImage(null)} />}
             <ConfirmationModal
                 isOpen={isDeleteModalOpen}
                 onClose={() => setIsDeleteModalOpen(false)}
@@ -979,7 +1000,7 @@ const QuantityInput: React.FC<{ value: string; onChange: (e: React.ChangeEvent<H
 
 interface InspectionFormProps {
     currentUserProfile: UserProfile | null;
-    onSubmit: (data: any) => void;
+    onSubmit: (data: any, imageFiles: File[]) => void;
     onCancel?: () => void;
     existingInspection?: QualityInspection | null;
     isSaving: boolean;
@@ -1018,6 +1039,34 @@ const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
     });
     
     const [formData, setFormData] = useState(getInitialState());
+    const [imageFiles, setImageFiles] = useState<File[]>([]);
+    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const cameraInputRef = useRef<HTMLInputElement>(null);
+
+     useEffect(() => {
+        // Cleanup object URLs to avoid memory leaks
+        return () => {
+            imagePreviews.forEach(preview => URL.revokeObjectURL(preview));
+        };
+    }, [imagePreviews]);
+
+    const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const files = Array.from(e.target.files);
+            const newPreviews = files.map(file => URL.createObjectURL(file as Blob | MediaSource));
+            setImageFiles(prev => [...prev, ...files] as File[]);
+            setImagePreviews(prev => [...prev, ...newPreviews]);
+        }
+    };
+
+    const removeImage = (index: number) => {
+        setImageFiles(prev => prev.filter((_, i) => i !== index));
+        setImagePreviews(prev => {
+            URL.revokeObjectURL(prev[index]);
+            return prev.filter((_, i) => i !== index);
+        });
+    };
     
     useEffect(() => {
         const dataToLoad = existingInspection || prefilledData;
@@ -1095,7 +1144,7 @@ const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
             ...formData,
             keywordPairs: formData.keywordPairs.filter(p => p.process.trim() !== '' || p.defect.trim() !== ''),
         };
-        onSubmit(submissionData);
+        onSubmit(submissionData, imageFiles);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
@@ -1105,6 +1154,7 @@ const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
     };
 
     const needsReason = ['불합격', '반출', '한도대기'].includes(formData.result as string);
+    const labelClasses = "block text-sm font-medium text-gray-700 dark:text-slate-300";
 
     return (
         <div className="h-full flex flex-col">
@@ -1167,6 +1217,27 @@ const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
                             </div>
                             <InputGroup label="외관검사이력"><TextAreaInput name="appearanceHistory" value={formData.appearanceHistory} onChange={handleChange} /></InputGroup>
                             <InputGroup label="기능검사이력"><TextAreaInput name="functionHistory" value={formData.functionHistory} onChange={handleChange} /></InputGroup>
+                            
+                             {!existingInspection && (
+                                <InputGroup label="이미지 첨부" className="md:col-span-2">
+                                    <div className="mt-1 flex items-center gap-2">
+                                        <input type="file" ref={fileInputRef} onChange={handleImageChange} multiple accept="image/*" className="hidden" />
+                                        <input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*" capture="environment" className="hidden" />
+                                        <button type="button" onClick={() => fileInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold border rounded-md hover:bg-slate-50 dark:hover:bg-slate-600">파일 선택</button>
+                                        <button type="button" onClick={() => cameraInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold border rounded-md hover:bg-slate-50 dark:hover:bg-slate-600">사진 촬영</button>
+                                    </div>
+                                    {imagePreviews.length > 0 && (
+                                        <div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
+                                            {imagePreviews.map((preview, index) => (
+                                                <div key={index} className="relative">
+                                                    <img src={preview} alt={`preview ${index}`} className="w-full h-24 object-cover rounded" />
+                                                    <button type="button" onClick={() => removeImage(index)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">&times;</button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </InputGroup>
+                            )}
                             
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-5 pt-4 border-t dark:border-slate-700">
                                 <InputGroup label="결과" className="md:col-span-1">
@@ -1244,6 +1315,34 @@ const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserPro
     });
 
     const [formData, setFormData] = useState(getInitialState());
+    const [imageFiles, setImageFiles] = useState<File[]>([]);
+    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const cameraInputRef = useRef<HTMLInputElement>(null);
+
+     useEffect(() => {
+        // Cleanup object URLs to avoid memory leaks
+        return () => {
+            imagePreviews.forEach(preview => URL.revokeObjectURL(preview));
+        };
+    }, [imagePreviews]);
+
+    const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const files = Array.from(e.target.files);
+            const newPreviews = files.map(file => URL.createObjectURL(file as Blob | MediaSource));
+            setImageFiles(prev => [...prev, ...files] as File[]);
+            setImagePreviews(prev => [...prev, ...newPreviews]);
+        }
+    };
+
+    const removeImage = (index: number) => {
+        setImageFiles(prev => prev.filter((_, i) => i !== index));
+        setImagePreviews(prev => {
+            URL.revokeObjectURL(prev[index]);
+            return prev.filter((_, i) => i !== index);
+        });
+    };
     
     useEffect(() => {
         const dataToLoad = existingInspection || prefilledData;
@@ -1449,7 +1548,7 @@ const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserPro
                 lineConditions: line.lineConditions?.filter(c => c.value.trim() !== '')
             })),
         };
-        onSubmit(submissionData);
+        onSubmit(submissionData, imageFiles);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
@@ -1457,6 +1556,8 @@ const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserPro
             e.preventDefault();
         }
     };
+    
+    const labelClasses = "block text-sm font-medium text-gray-700 dark:text-slate-300";
 
     return (
         <div className="h-full flex flex-col">
@@ -1613,6 +1714,27 @@ const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserPro
                                 ))}
                                 <button type="button" onClick={addProcessLine} className="w-full py-2 border border-dashed border-gray-400 dark:border-slate-500 rounded-md text-sm hover:bg-slate-100 dark:hover:bg-slate-700">라인 정보 세트 추가</button>
                             </div>
+                            
+                            {!existingInspection && (
+                                <InputGroup label="이미지 첨부" className="md:col-span-2">
+                                    <div className="mt-1 flex items-center gap-2">
+                                        <input type="file" ref={fileInputRef} onChange={handleImageChange} multiple accept="image/*" className="hidden" />
+                                        <input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*" capture="environment" className="hidden" />
+                                        <button type="button" onClick={() => fileInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold border rounded-md hover:bg-slate-50 dark:hover:bg-slate-600">파일 선택</button>
+                                        <button type="button" onClick={() => cameraInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold border rounded-md hover:bg-slate-50 dark:hover:bg-slate-600">사진 촬영</button>
+                                    </div>
+                                    {imagePreviews.length > 0 && (
+                                        <div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
+                                            {imagePreviews.map((preview, index) => (
+                                                <div key={index} className="relative">
+                                                    <img src={preview} alt={`preview ${index}`} className="w-full h-24 object-cover rounded" />
+                                                    <button type="button" onClick={() => removeImage(index)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">&times;</button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </InputGroup>
+                            )}
 
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
                                 <InputGroup label="신뢰성테스트결과"><SelectInput name="reliabilityTestResult" value={formData.reliabilityTestResult.result} options={reliabilityResultOptions} onChange={(e) => handleComplexChange('reliabilityTestResult', 'result', e.target.value)} /></InputGroup>
@@ -1689,6 +1811,34 @@ const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
     });
     
     const [formData, setFormData] = useState(getInitialState());
+    const [imageFiles, setImageFiles] = useState<File[]>([]);
+    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const cameraInputRef = useRef<HTMLInputElement>(null);
+
+     useEffect(() => {
+        // Cleanup object URLs to avoid memory leaks
+        return () => {
+            imagePreviews.forEach(preview => URL.revokeObjectURL(preview));
+        };
+    }, [imagePreviews]);
+
+    const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const files = Array.from(e.target.files);
+            const newPreviews = files.map(file => URL.createObjectURL(file as Blob | MediaSource));
+            setImageFiles(prev => [...prev, ...files] as File[]);
+            setImagePreviews(prev => [...prev, ...newPreviews]);
+        }
+    };
+
+    const removeImage = (index: number) => {
+        setImageFiles(prev => prev.filter((_, i) => i !== index));
+        setImagePreviews(prev => {
+            URL.revokeObjectURL(prev[index]);
+            return prev.filter((_, i) => i !== index);
+        });
+    };
     
     useEffect(() => {
         const dataToLoad = existingInspection || prefilledData;
@@ -1829,7 +1979,7 @@ const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
 
     const handleFormSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSubmit(formData);
+        onSubmit(formData, imageFiles);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
@@ -1837,6 +1987,8 @@ const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
             e.preventDefault();
         }
     };
+    
+    const labelClasses = "block text-sm font-medium text-gray-700 dark:text-slate-300";
 
     return (
         <div className="h-full flex flex-col">
@@ -1871,6 +2023,27 @@ const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
                                 <InputGroup label="재검사요청 내용"><TextAreaInput name="reinspectionContent" value={formData.reinspectionContent || ''} onChange={handleChange} rows={1} /></InputGroup>
                             </div>
                             
+                            {!existingInspection && (
+                                <InputGroup label="이미지 첨부" className="md:col-span-2">
+                                    <div className="mt-1 flex items-center gap-2">
+                                        <input type="file" ref={fileInputRef} onChange={handleImageChange} multiple accept="image/*" className="hidden" />
+                                        <input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*" capture="environment" className="hidden" />
+                                        <button type="button" onClick={() => fileInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold border rounded-md hover:bg-slate-50 dark:hover:bg-slate-600">파일 선택</button>
+                                        <button type="button" onClick={() => cameraInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold border rounded-md hover:bg-slate-50 dark:hover:bg-slate-600">사진 촬영</button>
+                                    </div>
+                                    {imagePreviews.length > 0 && (
+                                        <div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
+                                            {imagePreviews.map((preview, index) => (
+                                                <div key={index} className="relative">
+                                                    <img src={preview} alt={`preview ${index}`} className="w-full h-24 object-cover rounded" />
+                                                    <button type="button" onClick={() => removeImage(index)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">&times;</button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </InputGroup>
+                            )}
+
                             <div className="pt-4 border-t dark:border-slate-700">
                                 <InputGroup label="작업자 인원수"><TextInput name="workerCount" value={formData.workerCount} onChange={handleWorkerCountChange} /></InputGroup>
                             </div>
@@ -1988,7 +2161,7 @@ const CircleCenter: React.FC<{
         }
     }, [prefilledData, addToast]);
     
-    const handleFormSubmit = async (formData: any) => {
+    const handleFormSubmit = async (formData: any, imageFiles: File[]) => {
         if (!currentUserProfile) {
             addToast({ message: '로그인이 필요합니다.', type: 'error' });
             return;
@@ -2010,6 +2183,7 @@ const CircleCenter: React.FC<{
                     createdAt: new Date().toISOString(),
                     history: [{ status: '생성됨', date: new Date().toISOString(), user: currentUserProfile.displayName, reason: '신규 검사 등록' }],
                     comments: [],
+                    imageUrls: [],
                 };
     
                 const existingGroup = inspections.filter(insp => insp.orderNumber === payload.orderNumber && insp.orderNumber !== 'T');
@@ -2039,6 +2213,21 @@ const CircleCenter: React.FC<{
     
                 const newDocRef = await db.collection('quality-inspections').add(payload);
     
+                 if (imageFiles.length > 0) {
+                    addToast({ message: `이미지 업로드 중... (0/${imageFiles.length})`, type: 'info' });
+                    const imageUrls = await Promise.all(
+                        imageFiles.map(async (file, index) => {
+                            const uniqueFileName = `${Date.now()}-${file.name}`;
+                            const imageRef = storage.ref(`quality-inspection-images/${newDocRef.id}/${uniqueFileName}`);
+                            const snapshot = await imageRef.put(file);
+                            const downloadURL = await snapshot.ref.getDownloadURL();
+                            addToast({ message: `이미지 업로드 중... (${index + 1}/${imageFiles.length})`, type: 'info' });
+                            return downloadURL;
+                        })
+                    );
+                    await newDocRef.update({ imageUrls });
+                }
+
                 await db.collection('notifications').add({
                     message: `신규 ${activeTab} 품질검사 '${payload.productName}'이(가) 등록되었습니다.`,
                     date: new Date().toISOString(),

@@ -7,9 +7,6 @@ interface HomeScreenProps {
     onSearchSubmit: (query: string) => void;
     notifications: Notification[];
     onNotificationClick: (notification: Notification) => void;
-    fcmSupported?: boolean;
-    fcmError?: string | null;
-    onRequestFCMPermission?: () => Promise<boolean>;
 }
 
 const timeAgo = (dateString: string): string => {
@@ -39,7 +36,7 @@ const QuickAccessButton: React.FC<{ title: string; onClick: () => void; icon: Re
     </button>
 );
 
-const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectCenter, onSearchSubmit, notifications, onNotificationClick, fcmSupported, fcmError, onRequestFCMPermission }) => {
+const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectCenter, onSearchSubmit, notifications, onNotificationClick }) => {
     const [query, setQuery] = useState('');
     const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
 
@@ -125,33 +122,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectCenter, onSearchSubmit,
                             ) : (
                                 <p className="text-slate-500 text-center py-8">읽지 않은 알림이 없습니다.</p>
                             )}
-                        </div>
-                        
-                        {/* FCM 권한 요청 섹션 */}
-                        <div className="border-t dark:border-slate-700 p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-gray-800 dark:text-white">푸시 알림</p>
-                                    <p className="text-xs text-gray-500 dark:text-slate-400">
-                                        {!fcmSupported ? 'FCM을 지원하지 않는 브라우저입니다' :
-                                         fcmError ? fcmError : 
-                                         onRequestFCMPermission ? '중요한 알림을 실시간으로 받아보세요' : 'FCM 권한 요청 함수가 없습니다'}
-                                    </p>
-                                </div>
-                                {fcmSupported && onRequestFCMPermission && (
-                                    <button
-                                        onClick={async () => {
-                                            const success = await onRequestFCMPermission();
-                                            if (success) {
-                                                setIsNotificationPanelOpen(false);
-                                            }
-                                        }}
-                                        className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-md transition-colors"
-                                    >
-                                        {fcmError ? '다시 시도' : '알림 허용'}
-                                    </button>
-                                )}
-                            </div>
                         </div>
                     </div>
                 </div>
