@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef, useCallback, ChangeEvent } from 'react';
 import QualityNavigation from './QualityNavigation';
 import { UserProfile, QualityInspection, InspectionType, HistoryEntry, Comment, Status, GroupedInspectionData, InspectionResult, WorkerResult, DefectReason, WorkerInspectionData, KeywordPair, TestResultDetail, ProcessLineData, ReliabilityReview } from '../types';
@@ -2169,13 +2168,17 @@ const CircleCenter: React.FC<{
     
         setIsSaving(true);
         try {
-            if (existingInspection) {
+            if (existingInspection || formData.id) {
+                const docId = existingInspection?.id || formData.id;
+                if (!docId) {
+                  throw new Error("Cannot update inspection without an ID.");
+                }
                 const { id, createdAt, history, inspector, ...dataToSave } = formData;
-                await onUpdateInspection(existingInspection.id!, dataToSave, '사용자에 의해 수정됨');
+                await onUpdateInspection(docId, dataToSave, '사용자에 의해 수정됨');
                 addToast({ message: '검사 정보가 성공적으로 수정되었습니다.', type: 'success' });
                 onEditHandled();
             } else {
-                const { id, ...dataToSave } = formData;
+                const { id, createdAt, history, inspector, ...dataToSave } = formData;
                 const payload: QualityInspection = {
                     ...dataToSave,
                     inspector: currentUserProfile.displayName,

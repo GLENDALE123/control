@@ -729,6 +729,142 @@ const getLocalDateString = (date = new Date()) => {
     return localDate.toISOString().split('T')[0];
 };
 
+const ShortageRequestModal: FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    report: PackagingReport;
+    existingRequest?: ShortageRequest;
+    onSave: (data: { shortageReason: string, requestedShortageQuantity: number }) => void;
+    isSaving: boolean;
+}> = ({ isOpen, onClose, report, existingRequest, onSave, isSaving }) => {
+    const [reason, setReason] = useState(existingRequest?.shortageReason || '');
+    const [quantity, setQuantity] = useState(existingRequest?.requestedShortageQuantity?.toString() || '');
+
+    useEffect(() => {
+        if (isOpen) {
+            setReason(existingRequest?.shortageReason || '');
+            setQuantity(existingRequest?.requestedShortageQuantity?.toString() || '');
+        }
+    }, [isOpen, existingRequest]);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const numQuantity = parseInt(quantity, 10);
+        if (!reason.trim() || isNaN(numQuantity) || numQuantity <= 0) {
+            alert('유효한 사유와 부족 수량을 입력해주세요.');
+            return;
+        }
+        onSave({ shortageReason: reason, requestedShortageQuantity: numQuantity });
+    };
+
+    return (
+        <FullScreenModal isOpen={isOpen} onClose={onClose} title={existingRequest ? "부족분 신청 수정" : "부족분 생산 요청"}>
+            <div className="p-6 space-y-4">
+                <h3 className="text-lg font-semibold">{report.productName} ({report.partName})</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg">
+                    <p><strong>발주번호:</strong> {report.orderNumbers.join(', ')}</p>
+                    <p><strong>생산라인:</strong> {report.productionLine}</p>
+                    <p><strong>투입수량:</strong> {report.inputQuantity?.toLocaleString()}</p>
+                    <p><strong>양품수량:</strong> {report.goodQuantity?.toLocaleString()}</p>
+                    <p className="text-red-500 font-semibold"><strong>불량수량:</strong> {report.defectQuantity?.toLocaleString()}</p>
+                </div>
+                <form id="shortage-form" onSubmit={handleSubmit}>
+                    <div>
+                        <label className="block text-sm font-medium">부족분 사유</label>
+                        <textarea
+                            value={reason}
+                            onChange={e => setReason(e.target.value)}
+                            rows={4}
+                            required
+                            className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium">부족분 요청 수량</label>
+                        <input
+                            type="number"
+                            value={quantity}
+                            onChange={e => setQuantity(e.target.value)}
+                            required
+                            min="1"
+                            className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700"
+                        />
+                    </div>
+                </form>
+            </div>
+            <div className="flex-shrink-0 p-4 border-t dark:border-slate-700 flex justify-end gap-2">
+                <button type="button" onClick={onClose} className="bg-gray-200 dark:bg-slate-600 px-4 py-2 rounded-lg">취소</button>
+                <button type="submit" form="shortage-form" disabled={isSaving} className="bg-primary-600 text-white px-4 py-2 rounded-lg disabled:opacity-50">
+                    {isSaving ? '저장 중...' : (existingRequest ? '수정 저장' : '신청 저장')}
+                </button>
+            </div>
+        </FullScreenModal>
+    );
+};
+
+const ShortageRequestDetailModal: FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    request: ShortageRequest;
+    onEdit: (request: ShortageRequest) => void;
+    onDelete: () => void;
+    currentUserProfile: UserProfile | null;
+}> = ({ isOpen, onClose, request, onEdit, onDelete, currentUserProfile }) => {
+    
+    const canManage = currentUserProfile?.role === 'Admin' || currentUserProfile?.role === 'Manager';
+
+    return (
+        <FullScreenModal isOpen={isOpen} onClose={onClose} title="부족분 신청 상세 내역">
+            <div className="p-6 space-y-6">
+                <div>
+                    <h3 className="text-xl font-bold">{request.productName} ({request.partName})</h3>
+                    <p className="text-sm text-slate-500">{request.orderNumbers.join(', ')}</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg space-y-3">
+                        <h4 className="font-semibold text-lg border-b pb-2">신청 정보</h4>
+                        <p><strong>신청일:</strong> {new Date(request.createdAt).toLocaleString('ko-KR')}</p>
+                        <p><strong>신청자:</strong> {request.author.displayName}</p>
+                        <p className="font-bold text-lg"><strong>요청수량:</strong> <span className="text-red-500">{request.requestedShortageQuantity.toLocaleString()} EA</span></p>
+                        <div>
+                            <p><strong>사유:</strong></p>
+                            <p className="p-2 bg-white dark:bg-slate-800 rounded mt-1 whitespace-pre-wrap">{request.shortageReason}</p>
+                        </div>
+                        <p><strong>상태:</strong> {request.status}</p>
+                    </div>
+
+                    <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg space-y-3">
+                        <h4 className="font-semibold text-lg border-b pb-2">원본 생산 정보</h4>
+                        <p><strong>생산라인:</strong> {request.productionLine}</p>
+                        <p><strong>투입수량:</strong> {request.inputQuantity?.toLocaleString()}</p>
+                        <p><strong>양품수량:</strong> {request.goodQuantity?.toLocaleString()}</p>
+                        <p className="text-red-500"><strong>불량수량:</strong> {request.defectQuantity?.toLocaleString()}</p>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 className="font-semibold text-lg mb-2">처리 이력</h4>
+                    <ul className="space-y-2 text-sm">
+                        {request.history?.map((h, i) => (
+                            <li key={i} className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-700/50 rounded">
+                                <span className="font-semibold">{new Date(h.date).toLocaleString('ko-KR')}</span>
+                                <span className="font-medium">{h.status} by {h.user}</span>
+                                {h.reason && <span className="text-slate-500">- {h.reason}</span>}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </div>
+             <div className="flex-shrink-0 p-4 border-t dark:border-slate-700 flex justify-end gap-2">
+                {canManage && <button onClick={() => onEdit(request)} className="bg-blue-600 text-white px-4 py-2 rounded-lg">수정</button>}
+                {currentUserProfile?.role === 'Admin' && <button onClick={onDelete} className="bg-red-600 text-white px-4 py-2 rounded-lg">삭제</button>}
+                <button type="button" onClick={onClose} className="bg-gray-200 dark:bg-slate-600 px-4 py-2 rounded-lg">닫기</button>
+            </div>
+        </FullScreenModal>
+    );
+};
+
 // FIX: Changed component to a named export to resolve module resolution issues.
 export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ addToast, currentUserProfile, productionRequests, onOpenNewProductionRequest, onSelectProductionRequest, productionSchedules, onSaveProductionSchedules, onDeleteProductionSchedule }) => {
     const [activeTab, setActiveTab] = useState<ActiveWorkCenterTab>('reportList');
@@ -1234,6 +1370,37 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
             </div>
 
              {/* Modals */}
+             {shortageModalState && (
+                <ShortageRequestModal
+                    isOpen={!!shortageModalState}
+                    onClose={() => setShortageModalState(null)}
+                    report={shortageModalState.report}
+                    existingRequest={shortageModalState.mode === 'edit' ? shortageModalState.request : undefined}
+                    onSave={handleSaveShortageRequest}
+                    isSaving={isSavingShortage}
+                />
+            )}
+            {selectedShortageDetail && (
+                <ShortageRequestDetailModal
+                    isOpen={!!selectedShortageDetail}
+                    onClose={() => setSelectedShortageDetail(null)}
+                    request={selectedShortageDetail}
+                    onEdit={handleOpenEditShortageForm}
+                    onDelete={() => {
+                        if (selectedShortageDetail) {
+                            setItemToDelete(selectedShortageDetail);
+                        }
+                    }}
+                    currentUserProfile={currentUserProfile}
+                />
+            )}
+            <ConfirmationModal
+                isOpen={!!itemToDelete}
+                onClose={() => setItemToDelete(null)}
+                onConfirm={handleDeleteShortageRequest}
+                title="부족분 신청 삭제 확인"
+                message={`'${itemToDelete?.productName}' 부족분 신청 내역을 정말 삭제하시겠습니까?`}
+            />
         </div>
     );
 };
