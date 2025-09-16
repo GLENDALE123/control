@@ -455,16 +455,18 @@ export const ProductionScheduleList: React.FC<ProductionScheduleListProps> = ({ 
                         {Object.entries(schedulesByDate).map(([date, schedulesForDate]) => (
                              <React.Fragment key={date}>
                                 <tr className="bg-slate-100 dark:bg-slate-700/50 sticky top-12 z-[1]">
-                                    <th colSpan={displayHeaders.length + (canManage ? 1 : 0)} className="px-4 py-2 text-left text-lg font-bold text-gray-800 dark:text-white flex justify-between items-center">
-                                        <span>{date} ({new Date(date + 'T00:00:00').toLocaleDateString('ko-KR', { weekday: 'long' })})</span>
-                                        {canManage && (
-                                            <button 
-                                                onClick={() => setDateToDelete(date)}
-                                                className="bg-red-500 text-white px-3 py-1 text-xs rounded-md hover:bg-red-600 transition-colors"
-                                            >
-                                                이 날짜 전체 삭제
-                                            </button>
-                                        )}
+                                    <th colSpan={displayHeaders.length + (canManage ? 1 : 0)} className="px-4 py-2 text-left text-lg font-bold text-gray-800 dark:text-white">
+                                        <div className="flex items-center gap-4">
+                                            <span>{date} ({new Date(date + 'T00:00:00').toLocaleDateString('ko-KR', { weekday: 'long' })})</span>
+                                            {canManage && (
+                                                <button 
+                                                    onClick={() => setDateToDelete(date)}
+                                                    className="bg-red-500 text-white px-3 py-1 text-xs rounded-md hover:bg-red-600 transition-colors"
+                                                >
+                                                    이 날짜 전체 삭제
+                                                </button>
+                                            )}
+                                        </div>
                                     </th>
                                 </tr>
                                 {schedulesForDate.map((s) => (
