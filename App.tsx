@@ -1619,11 +1619,10 @@ const App: React.FC = () => {
         }
     
         try {
-            // FIX: transaction.get() with a Query parameter is not supported in the Firestore SDK version being used.
-            // The query to find documents for deletion is performed outside the transaction.
-            // This resolves the TypeScript errors on lines 1601 and 1602.
             const schedulesToDeleteRefs: firebase.firestore.DocumentReference[] = [];
-            const CHUNK_SIZE = 30; // Firestore 'in' query limit
+            // Firestore 'in' queries are limited to 10 items in some SDK versions/configurations.
+            // Using a safer chunk size of 10 instead of 30 to prevent query failures.
+            const CHUNK_SIZE = 10;
     
             for (let i = 0; i < uniqueDates.length; i += CHUNK_SIZE) {
                 const dateChunk = uniqueDates.slice(i, i + CHUNK_SIZE);
