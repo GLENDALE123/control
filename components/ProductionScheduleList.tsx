@@ -7,6 +7,7 @@ interface ProductionScheduleListProps {
     schedules: ProductionSchedule[];
     onSave: (newSchedules: Omit<ProductionSchedule, 'id' | 'createdAt' | 'updatedAt'>[]) => Promise<void>;
     onDelete: (scheduleId: string) => void;
+    onDeleteByDate: (date: string) => void;
     currentUserProfile: UserProfile | null;
 }
 
@@ -244,7 +245,7 @@ const getLineGroup = (line?: string): string => {
 };
 
 
-export const ProductionScheduleList: React.FC<ProductionScheduleListProps> = ({ schedules, onSave, onDelete, currentUserProfile }) => {
+export const ProductionScheduleList: React.FC<ProductionScheduleListProps> = ({ schedules, onSave, onDelete, onDeleteByDate, currentUserProfile }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const today = getLocalDateString(new Date());
@@ -252,6 +253,7 @@ export const ProductionScheduleList: React.FC<ProductionScheduleListProps> = ({ 
     const [endDate, setEndDate] = useState(today);
     const [activeQuickFilter, setActiveQuickFilter] = useState<'today' | 'yesterday' | 'week' | 'all' | 'custom' | 'tomorrow' | 'nextWeek'>('today');
     const [itemToDelete, setItemToDelete] = useState<ProductionSchedule | null>(null);
+    const [dateToDelete, setDateToDelete] = useState<string | null>(null);
     const [isFilterVisible, setIsFilterVisible] = useState(false);
 
     const canManage = currentUserProfile?.role === 'Admin' || currentUserProfile?.role === 'Manager';
@@ -440,8 +442,8 @@ export const ProductionScheduleList: React.FC<ProductionScheduleListProps> = ({ 
             )}
 
             <main className="flex-1 overflow-auto p-4">
-                <table className="w-full min-w-max text-xs text-left text-gray-500 dark:text-slate-400 border-separate" style={{ borderSpacing: '0 1rem' }}>
-                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-slate-700 dark:text-slate-400">
+                <table className="w-full min-w-max text-xs text-left text-gray-500 dark:text-slate-400">
+                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-slate-700 dark:text-slate-400 sticky top-0 z-10">
                         <tr>
                             {displayHeaders.map(header => (
                                 <th key={header} scope="col" className="px-2 py-3 whitespace-nowrap">{header}</th>
@@ -452,70 +454,40 @@ export const ProductionScheduleList: React.FC<ProductionScheduleListProps> = ({ 
                     <tbody>
                         {Object.entries(schedulesByDate).map(([date, schedulesForDate]) => (
                              <React.Fragment key={date}>
-                                {schedulesForDate.map((s, index) => {
-                                    const isFirstRowInGroup = index === 0;
-                                    const isLastRowInGroup = index === schedulesForDate.length - 1;
-
-                                    const currentLineGroup = getLineGroup(s.line);
-                                    const prevLineGroup = index > 0 ? getLineGroup(schedulesForDate[index - 1].line) : null;
-                                    const needsLineSeparator = index > 0 && currentLineGroup !== prevLineGroup;
-
-                                    const borderClass = 'border-primary-300 dark:border-primary-700';
-                                    const colCount = displayHeaders.length + (canManage ? 1 : 0);
-                                    
-                                    const getCellClass = (cellIndex: number): string => {
-                                        let classes = "px-2 py-2 whitespace-nowrap bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50";
-                                        
-                                        if (isFirstRowInGroup) classes += ` border-t ${borderClass}`;
-                                        if (isLastRowInGroup) classes += ` border-b ${borderClass}`;
-                                        if (cellIndex === 0) classes += ` border-l ${borderClass}`;
-                                        if (cellIndex === colCount - 1) classes += ` border-r ${borderClass}`;
-
-                                        if (isFirstRowInGroup && cellIndex === 0) classes += ' rounded-tl-lg';
-                                        if (isFirstRowInGroup && cellIndex === colCount - 1) classes += ' rounded-tr-lg';
-                                        if (isLastRowInGroup && cellIndex === 0) classes += ' rounded-bl-lg';
-                                        if (isLastRowInGroup && cellIndex === colCount - 1) classes += ' rounded-br-lg';
-                                        
-                                        const key = fixedHeaderOrder[cellIndex];
-                                        if (key === 'line') classes += " font-semibold";
-                                        if (key === 'productName') classes += " text-gray-900 dark:text-white";
-                                        if (key === 'orderQuantity' || key === 'shortageQuantity') classes += " text-right";
-                                        if (key === 'remarks') classes += " max-w-xs truncate";
-
-                                        return classes;
-                                    };
-
-                                    return (
-                                        <React.Fragment key={s.id}>
-                                            {needsLineSeparator && (
-                                                <tr>
-                                                    <td colSpan={colCount} className={`py-1 px-2 border-l border-r ${borderClass} bg-white dark:bg-slate-800`}>
-                                                        <div className="h-0.5 bg-primary-300 dark:bg-primary-700"></div>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                            <tr className="group">
-                                                {fixedHeaderOrder.map((key, cellIndex) => {
-                                                    const value = s[key];
-                                                    let content = value;
-                                                    if (key === 'orderQuantity' || key === 'shortageQuantity') {
-                                                        content = typeof value === 'number' ? value.toLocaleString() : value;
-                                                    }
-                                                    return (
-                                                        <td key={key} className={getCellClass(cellIndex)} title={key === 'remarks' && typeof value === 'string' ? value : undefined}>
-                                                            {content as React.ReactNode}
-                                                        </td>
-                                                    );
-                                                })}
-                                                {canManage && (
-                                                    <td className={getCellClass(colCount - 1)}>
-                                                        <button onClick={() => handleDeleteClick(s)} className="font-medium text-red-600 dark:text-red-500 hover:underline">삭제</button>
-                                                    </td>
-                                                )}
-                                            </tr>
-                                        </React.Fragment>
-                                    );
-                                })}
+                                <tr className="bg-slate-100 dark:bg-slate-700/50 sticky top-12 z-[1]">
+                                    <th colSpan={displayHeaders.length + (canManage ? 1 : 0)} className="px-4 py-2 text-left text-lg font-bold text-gray-800 dark:text-white flex justify-between items-center">
+                                        <span>{date} ({new Date(date + 'T00:00:00').toLocaleDateString('ko-KR', { weekday: 'long' })})</span>
+                                        {canManage && (
+                                            <button 
+                                                onClick={() => setDateToDelete(date)}
+                                                className="bg-red-500 text-white px-3 py-1 text-xs rounded-md hover:bg-red-600 transition-colors"
+                                            >
+                                                이 날짜 전체 삭제
+                                            </button>
+                                        )}
+                                    </th>
+                                </tr>
+                                {schedulesForDate.map((s) => (
+                                    <tr key={s.id} className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                        {fixedHeaderOrder.map(key => {
+                                            const value = s[key];
+                                            let content = value;
+                                            if (key === 'orderQuantity' || key === 'shortageQuantity') {
+                                                content = typeof value === 'number' ? value.toLocaleString() : value;
+                                            }
+                                            return (
+                                                <td key={key} className="px-2 py-2 whitespace-nowrap" title={key === 'remarks' && typeof value === 'string' ? value : undefined}>
+                                                    {content as React.ReactNode}
+                                                </td>
+                                            );
+                                        })}
+                                        {canManage && (
+                                            <td className="px-2 py-2 whitespace-nowrap">
+                                                <button onClick={() => handleDeleteClick(s)} className="font-medium text-red-600 dark:text-red-500 hover:underline">삭제</button>
+                                            </td>
+                                        )}
+                                    </tr>
+                                ))}
                             </React.Fragment>
                         ))}
                     </tbody>
@@ -525,6 +497,18 @@ export const ProductionScheduleList: React.FC<ProductionScheduleListProps> = ({ 
             
             <UpdateScheduleModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={onSave} currentDate={startDate || today} />
             <ConfirmationModal isOpen={!!itemToDelete} onClose={() => setItemToDelete(null)} onConfirm={confirmDelete} title="일정 삭제 확인" message={`'${itemToDelete?.planDate}'의 '${itemToDelete?.productName}' 일정을 정말 삭제하시겠습니까?`} />
+            <ConfirmationModal 
+                isOpen={!!dateToDelete} 
+                onClose={() => setDateToDelete(null)} 
+                onConfirm={() => {
+                    if (dateToDelete) {
+                        onDeleteByDate(dateToDelete);
+                        setDateToDelete(null);
+                    }
+                }} 
+                title="일괄 삭제 확인" 
+                message={`'${dateToDelete}'의 모든 생산 일정을 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`} 
+            />
             <style>{`
                 @keyframes fade-in-down {
                   from { opacity: 0; transform: translateY(-10px); }

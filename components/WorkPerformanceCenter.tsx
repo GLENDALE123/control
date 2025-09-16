@@ -21,6 +21,7 @@ interface WorkPerformanceCenterProps {
     productionSchedules: ProductionSchedule[];
     onSaveProductionSchedules: (schedules: Omit<ProductionSchedule, 'id' | 'createdAt' | 'updatedAt'>[]) => Promise<void>;
     onDeleteProductionSchedule: (scheduleId: string) => Promise<void>;
+    onDeleteProductionSchedulesByDate: (date: string) => Promise<void>;
 }
 
 const productionLineOptions = ['증착1', '증착2', '증착1하도', '증착1상도', '증착2하도', '증착2상도', '2코팅', '1코팅', '내부코팅1호기', '내부코팅2호기', '내부코팅3호기', '증착1하도(아)', '증착1상도(아)', '증착2하도(아)', '증착2상도(아)'].sort((a,b) => a.localeCompare(b, 'ko'));
@@ -866,7 +867,7 @@ const ShortageRequestDetailModal: FC<{
 };
 
 // FIX: Changed component to a named export to resolve module resolution issues.
-export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ addToast, currentUserProfile, productionRequests, onOpenNewProductionRequest, onSelectProductionRequest, productionSchedules, onSaveProductionSchedules, onDeleteProductionSchedule }) => {
+export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ addToast, currentUserProfile, productionRequests, onOpenNewProductionRequest, onSelectProductionRequest, productionSchedules, onSaveProductionSchedules, onDeleteProductionSchedule, onDeleteProductionSchedulesByDate }) => {
     const [activeTab, setActiveTab] = useState<ActiveWorkCenterTab>('reportList');
     const [reports, setReports] = useState<PackagingReport[]>([]);
     const [shortageRequests, setShortageRequests] = useState<ShortageRequest[]>([]);
@@ -1365,7 +1366,7 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
                         </div>
                     </div>
                  )}
-                 {activeTab === 'scheduleList' && <ProductionScheduleList schedules={productionSchedules} onSave={onSaveProductionSchedules} onDelete={onDeleteProductionSchedule} currentUserProfile={currentUserProfile} />}
+                 {activeTab === 'scheduleList' && <ProductionScheduleList schedules={productionSchedules} onSave={onSaveProductionSchedules} onDelete={onDeleteProductionSchedule} onDeleteByDate={onDeleteProductionSchedulesByDate} currentUserProfile={currentUserProfile} />}
                  {activeTab === 'orderList' && <OrderRegistrationList />}
             </div>
 

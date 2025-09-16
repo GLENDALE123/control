@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { JigRequest, Status, Comment, MasterData, Requester, Destination, Approver, Notification, JigMasterItem, UserProfile, UserRole, QualityInspection, HistoryEntry, SampleRequest, SampleStatus, ActiveCenter, PackagingReport, ProductionRequest, ProductionRequestStatus, ProductionRequestType, ProductionSchedule } from './types';
 import ManagementLedger from './components/ManagementLedger';
@@ -1675,6 +1673,34 @@ const App: React.FC = () => {
         }
     }, [addToast, currentUserProfile]);
 
+    const handleDeleteProductionSchedulesByDate = useCallback(async (date: string) => {
+        if (!currentUserProfile || currentUserProfile.role === 'Member') {
+            addToast({ message: '일정을 삭제할 권한이 없습니다.', type: 'error' });
+            return;
+        }
+        addToast({ message: `${date}의 생산 일정을 삭제하는 중...`, type: 'info' });
+
+        try {
+            const querySnapshot = await db.collection('production-schedules').where('planDate', '==', date).get();
+            if (querySnapshot.empty) {
+                addToast({ message: '삭제할 일정이 없습니다.', type: 'info' });
+                return;
+            }
+
+            const batch = db.batch();
+            querySnapshot.docs.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
+
+            addToast({ message: `${date}의 생산 일정이 성공적으로 삭제되었습니다.`, type: 'success' });
+        } catch (error) {
+            console.error("Error deleting production schedules by date:", error);
+            addToast({ message: '일정 삭제에 실패했습니다.', type: 'error' });
+            throw error;
+        }
+    }, [addToast, currentUserProfile]);
+
   const renderJigContent = () => {
     switch (activeMenu) {
       case 'dashboard':
@@ -1808,7 +1834,7 @@ const App: React.FC = () => {
       case 'notification':
         return <main className="flex-1 overflow-auto p-2 sm:p-4"><NotificationCenter notifications={notifications} onNotificationClick={handleNotificationClick} addToast={addToast} currentUserProfile={currentUserProfile} /></main>;
       case 'work':
-        return <main className="flex-1 overflow-auto p-2 sm:p-4"><WorkPerformanceCenter addToast={addToast} currentUserProfile={currentUserProfile} productionRequests={productionRequests} onOpenNewProductionRequest={handleOpenNewProductionRequest} onSelectProductionRequest={handleSelectProductionRequest} productionSchedules={productionSchedules} onSaveProductionSchedules={handleSaveProductionSchedules} onDeleteProductionSchedule={handleDeleteProductionSchedule} /></main>;
+        return <main className="flex-1 overflow-auto p-2 sm:p-4"><WorkPerformanceCenter addToast={addToast} currentUserProfile={currentUserProfile} productionRequests={productionRequests} onOpenNewProductionRequest={handleOpenNewProductionRequest} onSelectProductionRequest={handleSelectProductionRequest} productionSchedules={productionSchedules} onSaveProductionSchedules={handleSaveProductionSchedules} onDeleteProductionSchedule={handleDeleteProductionSchedule} onDeleteProductionSchedulesByDate={handleDeleteProductionSchedulesByDate} /></main>;
       case 'sample':
         return <main className="flex-1 overflow-auto p-2 sm:p-4"><SampleCenter addToast={addToast} currentUserProfile={currentUserProfile} sampleRequests={sampleRequests} onOpenNewRequest={handleShowNewSampleRequestForm} onSelectRequest={handleSelectSampleRequest} /></main>;
       case 'settings':
