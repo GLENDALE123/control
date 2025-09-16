@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { JigRequest, Status, Comment, MasterData, Requester, Destination, Approver, Notification, JigMasterItem, UserProfile, UserRole, QualityInspection, HistoryEntry, SampleRequest, SampleStatus, ActiveCenter, PackagingReport, ProductionRequest, ProductionRequestStatus, ProductionRequestType, ProductionSchedule } from './types';
 import ManagementLedger from './components/ManagementLedger';
@@ -1627,13 +1628,14 @@ const App: React.FC = () => {
                     transaction.delete(ref);
                 });
     
-                newSchedulesData.forEach(scheduleItem => {
+                newSchedulesData.forEach((scheduleItem, index) => {
                     const newDocRef = db.collection('production-schedules').doc();
                     const now = new Date().toISOString();
                     const newSchedule: Omit<ProductionSchedule, 'id'> = {
                         ...scheduleItem,
                         createdAt: now,
                         updatedAt: now,
+                        orderIndex: index,
                     };
                     transaction.set(newDocRef, newSchedule);
                 });

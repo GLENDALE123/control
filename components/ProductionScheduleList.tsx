@@ -339,14 +339,18 @@ export const ProductionScheduleList: React.FC<ProductionScheduleListProps> = ({ 
             const dateComparison = a.planDate.localeCompare(b.planDate);
             if (dateComparison !== 0) return dateComparison;
 
+            const aOrder = a.orderIndex ?? Infinity;
+            const bOrder = b.orderIndex ?? Infinity;
+            if (aOrder !== bOrder) {
+                return aOrder - bOrder;
+            }
+
             const aLine = a.line || '';
             const bLine = b.line || '';
             const aIndex = productionLineSortOrder.indexOf(aLine);
             const bIndex = productionLineSortOrder.indexOf(bLine);
-            
             const aSortIndex = aIndex === -1 ? Infinity : aIndex;
             const bSortIndex = bIndex === -1 ? Infinity : bIndex;
-            
             if (aSortIndex !== bSortIndex) {
                 return aSortIndex - bSortIndex;
             }

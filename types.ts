@@ -156,6 +156,7 @@ export interface ProductionSchedule {
     shortageQuantity: number; // 부족수량
     createdAt: string;
     updatedAt: string;
+    orderIndex?: number;
 }
 
 export type ViewMode = 'ledger' | 'form' | 'detail' | 'kanban' | 'app' | 'excel';
