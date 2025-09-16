@@ -1526,6 +1526,13 @@ const App: React.FC = () => {
             readBy: [currentUserProfile.uid]
         };
         
+        const optimisticallyUpdatedRequest = { ...originalRequest, comments: [...(originalRequest.comments || []), newComment] };
+
+        setProductionRequests(prev => prev.map(r => r.id === id ? optimisticallyUpdatedRequest : r));
+        if (modal.view === 'productionRequestDetail' && modal.data?.id === id) {
+            setModal(prev => ({...prev, data: optimisticallyUpdatedRequest}));
+        }
+
         try {
             await db.collection('production-requests').doc(id).update({
                 comments: firebase.firestore.FieldValue.arrayUnion(newComment)
@@ -1533,9 +1540,13 @@ const App: React.FC = () => {
             addToast({ message: '댓글이 추가되었습니다.', type: 'success' });
         } catch (error) {
             console.error("Error adding production request comment:", error);
-            addToast({ message: "댓글 추가에 실패했습니다.", type: "error" });
+            addToast({ message: "댓글 추가에 실패했습니다. 변경사항이 되돌려집니다.", type: "error" });
+            setProductionRequests(prev => prev.map(r => r.id === id ? originalRequest : r));
+            if (modal.view === 'productionRequestDetail' && modal.data?.id === id) {
+                setModal(prev => ({...prev, data: originalRequest}));
+            }
         }
-    }, [addToast, currentUserProfile, productionRequests]);
+    }, [addToast, currentUserProfile, productionRequests, modal]);
     
     const handleDeleteProductionRequest = useCallback(async (id: string) => {
         if (currentUserProfile?.role !== 'Admin') {
