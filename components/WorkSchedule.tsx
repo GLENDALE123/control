@@ -209,7 +209,7 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
             addToast({ message: '이미지 업로드 중...', type: 'info' });
             const imageName = `schedule-${currentDate.getFullYear()}-${currentDate.getMonth() + 1}.png`;
             const storageRef = storage.ref(`announcements/${imageName}`);
-            const uploadTask = await storageRef.put(blob);
+            const uploadTask = await storageRef.put(blob, { contentType: 'image/png' });
             const downloadURL = await uploadTask.ref.getDownloadURL();
 
             addToast({ message: '공지사항을 등록 중입니다...', type: 'info' });

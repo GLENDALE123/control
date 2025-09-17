@@ -1,0 +1,29 @@
+[
+  {
+    "origin": [
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "https://hs-jig-b2093.web.app",
+      "https://hs-jig-b2093.firebaseapp.com",
+      "https://cosmic-semifreddo-3e0a4a.netlify.app"
+    ],
+    "method": ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"],
+    "responseHeader": [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "x-goog-meta-*",
+      "x-goog-resumable",
+      "X-Firebase-Storage-Version",
+      "x-client-data",
+      "X-Goog-Upload-Protocol",
+      "X-Goog-Upload-Command",
+      "X-Goog-Upload-Header-Content-Length",
+      "X-Goog-Upload-Header-Content-Type",
+      "X-Goog-Upload-Offset",
+      "Range"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]
+

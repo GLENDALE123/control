@@ -3,6 +3,7 @@ import ThemeToggle from './ThemeToggle';
 import AppIcon from './AppIcon';
 import { UserProfile, UserRole } from '../types';
 import { db } from '../firebaseConfig';
+import firebase from 'firebase/compat/app';
 
 type Theme = 'light' | 'dark';
 
@@ -118,10 +119,53 @@ const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile
             title="앱 전체 테마"
             description={theme === 'dark' ? '다크 모드 활성화됨. 눈의 피로를 줄여줍니다.' : '라이트 모드 활성화됨.'}
           >
-            <ThemeToggle theme={theme} setTheme={setTheme} />
+            <div className="flex items-center gap-3">
+              <ThemeToggle theme={theme} setTheme={setTheme} />
+              <button
+                onClick={() => {
+                  const user = firebase.auth().currentUser;
+                  if (!user) return;
+                  db.collection('users').doc(user.uid).collection('preferences').doc('singleton').set({ theme }, { merge: true }).catch(() => {});
+                }}
+                className="px-3 py-1.5 text-sm rounded-md bg-primary-600 text-white hover:bg-primary-700"
+              >
+                내 테마로 저장
+              </button>
+            </div>
           </SettingRow>
 
           {currentUserProfile?.role === 'Admin' && <UserManagement currentUserProfile={currentUserProfile} />}
+
+          <div className="p-4 border dark:border-slate-700 rounded-lg">
+            <h3 className="text-lg font-semibold text-gray-700 dark:text-slate-200 mb-2">알림 설정</h3>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mb-3">공지는 모든 사용자에게 공통 발송됩니다. 아래에서 나머지 카테고리를 개별 설정할 수 있어요.</p>
+            <div className="flex flex-wrap gap-3">
+              {[
+                { key: 'jig', label: '지그' },
+                { key: 'work', label: '생산' },
+                { key: 'quality', label: '품질' },
+                { key: 'sample', label: '샘플' },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={async () => {
+                    const user = firebase.auth().currentUser;
+                    if (!user) return;
+                    const docRef = db.collection('users').doc(user.uid).collection('preferences').doc('singleton');
+                    const snap = await docRef.get();
+                    const data = snap.exists ? snap.data() || {} : {};
+                    const current = data.notificationPrefs?.[key];
+                    const next = !(current === true);
+                    const update = { notificationPrefs: { ...(data.notificationPrefs || {}), [key]: next } };
+                    await docRef.set(update, { merge: true });
+                  }}
+                  className="px-3 py-1.5 text-sm rounded-md border dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700"
+                >
+                  {label} 토글
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="p-4 border dark:border-slate-700 rounded-lg">
              <h3 className="text-lg font-semibold text-gray-700 dark:text-slate-200 mb-4">앱 정보</h3>

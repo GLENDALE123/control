@@ -2220,12 +2220,18 @@ const CircleCenter: React.FC<{
                     addToast({ message: `이미지 업로드 중... (0/${imageFiles.length})`, type: 'info' });
                     const imageUrls = await Promise.all(
                         imageFiles.map(async (file, index) => {
-                            const uniqueFileName = `${Date.now()}-${file.name}`;
-                            const imageRef = storage.ref(`quality-inspection-images/${newDocRef.id}/${uniqueFileName}`);
-                            const snapshot = await imageRef.put(file);
-                            const downloadURL = await snapshot.ref.getDownloadURL();
-                            addToast({ message: `이미지 업로드 중... (${index + 1}/${imageFiles.length})`, type: 'info' });
-                            return downloadURL;
+                            try {
+                                const uniqueFileName = `${Date.now()}-${file.name}`;
+                                const imageRef = storage.ref(`quality-inspection-images/${newDocRef.id}/${uniqueFileName}`);
+                                const snapshot = await imageRef.put(file, { contentType: file.type || 'image/*' });
+                                const downloadURL = await snapshot.ref.getDownloadURL();
+                                addToast({ message: `이미지 업로드 중... (${index + 1}/${imageFiles.length})`, type: 'info' });
+                                return downloadURL;
+                            } catch (e) {
+                                console.error('Image upload failed (quality-inspection):', file.name, e);
+                                addToast({ message: `이미지 업로드 실패: ${file.name}`, type: 'error' });
+                                throw e;
+                            }
                         })
                     );
                     await newDocRef.update({ imageUrls });

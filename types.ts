@@ -224,6 +224,17 @@ export interface UserProfile {
   role: UserRole;
 }
 
+export interface UserPreferences {
+  theme?: 'light' | 'dark';
+  notificationPrefs?: {
+    announcements?: boolean;
+    jig?: boolean;
+    work?: boolean;
+    quality?: boolean;
+    sample?: boolean;
+  };
+}
+
 export type InspectionType = 'incoming' | 'inProcess' | 'outgoing';
 export type InspectionResult = '합격' | '불합격' | '한도대기' | '한도승인' | '반출';
 

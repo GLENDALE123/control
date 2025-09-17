@@ -378,9 +378,16 @@ const QualityIssueCenter: React.FC<QualityIssueCenterProps> = ({ currentUserProf
             
             if (imageFiles.length > 0) {
                 const imageUrls = await Promise.all(
-                    imageFiles.map(file => {
-                        const ref = storage.ref(`quality-issue-images/${newDocRef.id}/${Date.now()}-${file.name}`);
-                        return ref.put(file).then(snapshot => snapshot.ref.getDownloadURL());
+                    imageFiles.map(async (file) => {
+                        try {
+                            const ref = storage.ref(`quality-issue-images/${newDocRef.id}/${Date.now()}-${file.name}`);
+                            const snapshot = await ref.put(file, { contentType: file.type || 'image/*' });
+                            return await snapshot.ref.getDownloadURL();
+                        } catch (e) {
+                            console.error('Image upload failed (quality-issue):', file.name, e);
+                            addToast({ message: `이미지 업로드 실패: ${file.name}`, type: 'error' });
+                            throw e;
+                        }
                     })
                 );
                 await newDocRef.update({ imageUrls });

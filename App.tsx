@@ -99,7 +99,7 @@ const ToastContainer: React.FC<{ toasts: Toast[]; onRemove: (id: number) => void
 };
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<firebase.User | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [requests, setRequests] = useState<JigRequest[]>([]);
@@ -482,10 +482,47 @@ const App: React.FC = () => {
         addToast({ message: '설정 정보를 불러오는 데 실패했습니다.', type: 'error' });
     });
 
+    // User preferences override
+    let unsubscribeUserPrefs: (() => void) | null = null;
+    if (user) {
+      const prefDocRef = db.collection('users').doc(user.uid).collection('preferences').doc('singleton');
+      unsubscribeUserPrefs = prefDocRef.onSnapshot(async (snap) => {
+        try {
+          if (!snap.exists) {
+            // Create defaults when missing
+            await prefDocRef.set({
+              notificationPrefs: { jig: true, work: true, quality: true, sample: true }
+            }, { merge: true });
+            return;
+          }
+
+          const prefs = (snap.data() as any) || {};
+          // Fill any missing keys with true without overriding existing false
+          const needed: Record<string, boolean> = {};
+          const keys = ['jig','work','quality','sample'];
+          keys.forEach((k) => {
+            if (prefs?.notificationPrefs?.[k] === undefined) {
+              needed[`notificationPrefs.${k}`] = true;
+            }
+          });
+          if (Object.keys(needed).length > 0) {
+            await prefDocRef.set(needed, { merge: true });
+          }
+
+          if (prefs?.theme) setTheme(prefs.theme);
+        } catch (e) {
+          console.error('Error initializing user preferences:', e);
+        }
+      }, (error) => {
+        console.error('Error fetching user preferences:', error);
+      });
+    }
+
     return () => {
         unsubscribeRequests();
         unsubscribeMasterData();
         unsubscribeSettings();
+        if (unsubscribeUserPrefs) unsubscribeUserPrefs();
         unsubscribeJigs();
         unsubscribeNotifications();
         unsubscribeSampleRequests();
@@ -623,12 +660,18 @@ const App: React.FC = () => {
                 addToast({ message: `이미지 업로드 중... (0/${imageFiles.length})`, type: 'info' });
                 const imageUrls = await Promise.all(
                     imageFiles.map(async (file, index) => {
-                        const uniqueFileName = `${Date.now()}-${file.name}`;
-                        const imageRef = storage.ref(`jig-request-images/${newId}/${uniqueFileName}`);
-                        const snapshot = await imageRef.put(file);
-                        const downloadURL = await snapshot.ref.getDownloadURL();
-                        addToast({ message: `이미지 업로드 중... (${index + 1}/${imageFiles.length})`, type: 'info' });
-                        return downloadURL;
+                        try {
+                            const uniqueFileName = `${Date.now()}-${file.name}`;
+                            const imageRef = storage.ref(`jig-request-images/${newId}/${uniqueFileName}`);
+                            const snapshot = await imageRef.put(file, { contentType: file.type || 'image/*' });
+                            const downloadURL = await snapshot.ref.getDownloadURL();
+                            addToast({ message: `이미지 업로드 중... (${index + 1}/${imageFiles.length})`, type: 'info' });
+                            return downloadURL;
+                        } catch (e) {
+                            console.error('Image upload failed (jig-request):', file.name, e);
+                            addToast({ message: `이미지 업로드 실패: ${file.name}`, type: 'error' });
+                            throw e;
+                        }
                     })
                 );
                 await db.collection('jig-requests').doc(newId).update({ imageUrls });
@@ -993,7 +1036,7 @@ const App: React.FC = () => {
         for (const file of imageFiles) {
             const uniqueFileName = `${Date.now()}-${file.name}`;
             const imageRef = storage.ref(`jig-master-images/${newId}/${uniqueFileName}`);
-            const snapshot = await imageRef.put(file);
+            const snapshot = await imageRef.put(file, { contentType: file.type || 'image/*' });
             const downloadURL = await snapshot.ref.getDownloadURL();
             imageUrls.push(downloadURL);
         }
@@ -1178,7 +1221,7 @@ const App: React.FC = () => {
                 const imageUrls = await Promise.all(
                     images.map(file => {
                         const ref = storage.ref(`sample-request-images/${newId}/${Date.now()}-${file.name}`);
-                        return ref.put(file).then(snapshot => snapshot.ref.getDownloadURL());
+                        return ref.put(file, { contentType: file.type || 'image/*' }).then(snapshot => snapshot.ref.getDownloadURL());
                     })
                 );
                 await db.collection('sample-requests').doc(newId).update({ imageUrls });
@@ -1299,7 +1342,7 @@ const App: React.FC = () => {
     const handleUploadSampleImage = useCallback(async (id: string, file: File) => {
         try {
             const ref = storage.ref(`sample-request-images/${id}/${Date.now()}-${file.name}`);
-            const snapshot = await ref.put(file);
+            const snapshot = await ref.put(file, { contentType: file.type || 'image/*' });
             const downloadURL = await snapshot.ref.getDownloadURL();
             await db.collection('sample-requests').doc(id).update({
                 imageUrls: firebase.firestore.FieldValue.arrayUnion(downloadURL)
@@ -1443,7 +1486,7 @@ const App: React.FC = () => {
                         imageFiles.map(async (file) => {
                             const uniqueFileName = `${Date.now()}-${file.name}`;
                             const imageRef = storage.ref(`production-request-images/${newId}/${uniqueFileName}`);
-                            const snapshot = await imageRef.put(file);
+                            const snapshot = await imageRef.put(file, { contentType: file.type || 'image/*' });
                             return await snapshot.ref.getDownloadURL();
                         })
                     );
@@ -1617,7 +1660,7 @@ const App: React.FC = () => {
         }
     
         try {
-            const schedulesToDeleteRefs: firebase.firestore.DocumentReference[] = [];
+            const schedulesToDeleteRefs: any[] = [];
             // Firestore 'in' queries are limited to 10 items in some SDK versions/configurations.
             // Using a safer chunk size of 10 instead of 30 to prevent query failures.
             const CHUNK_SIZE = 10;
