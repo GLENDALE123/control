@@ -1,34 +1,75 @@
 /* eslint-disable no-undef */
-// Firebase Messaging service worker (compat)
-importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js');
-importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js');
+// Firebase Messaging service worker (compat, safe)
+try {
+  importScripts('https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js');
+  importScripts('https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging-compat.js');
 
-firebase.initializeApp({
-  apiKey: "AIzaSyB4nSpGhucC0NR57Zpu_syg86sjdFtLtaU",
-  authDomain: "hs-jig-b2093.firebaseapp.com",
-  projectId: "hs-jig-b2093",
-  storageBucket: "hs-jig-b2093.appspot.com",
-  messagingSenderId: "117861579792",
-  appId: "1:117861579792:web:93de9aeca7771940745e95"
-});
+  // Ensure immediate control
+  self.addEventListener('install', () => {
+    try { self.skipWaiting(); } catch (e) {}
+  });
+  self.addEventListener('activate', (event) => {
+    event.waitUntil((async () => {
+      try { await self.clients.claim(); } catch (e) {}
+    })());
+  });
 
-const messaging = firebase.messaging();
+  firebase.initializeApp({
+    apiKey: "AIzaSyB4nSpGhucC0NR57Zpu_syg86sjdFtLtaU",
+    authDomain: "hs-jig-b2093.firebaseapp.com",
+    projectId: "hs-jig-b2093",
+    storageBucket: "hs-jig-b2093.appspot.com",
+    messagingSenderId: "117861579792",
+    appId: "1:117861579792:web:93de9aeca7771940745e95"
+  });
 
-// Background messages
-messaging.setBackgroundMessageHandler(function(payload) {
-  const title = (payload && payload.notification && payload.notification.title) || '백그라운드 알림';
-  const options = {
-    body: (payload && payload.notification && payload.notification.body) || '',
-    icon: (payload && payload.notification && payload.notification.icon) || undefined,
-    data: payload?.data || {}
-  };
-  return self.registration.showNotification(title, options);
-});
+  const messaging = firebase.messaging();
 
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  const targetUrl = event.notification.data?.url || '/';
-  event.waitUntil(clients.openWindow(targetUrl));
-});
+  if (messaging && typeof messaging.onBackgroundMessage === 'function') {
+    messaging.onBackgroundMessage(function (payload) {
+      var n = (payload && payload.notification) || {};
+      var title = n.title || '알림';
+      var options = {
+        body: n.body || '',
+        icon: n.icon || undefined,
+        data: (payload && payload.data) || {}
+      };
+      self.registration.showNotification(title, options);
+    });
+  } else if (messaging && typeof messaging.setBackgroundMessageHandler === 'function') {
+    messaging.setBackgroundMessageHandler(function (payload) {
+      var n = (payload && payload.notification) || {};
+      var title = n.title || '알림';
+      var options = {
+        body: n.body || '',
+        icon: n.icon || undefined,
+        data: (payload && payload.data) || {}
+      };
+      return self.registration.showNotification(title, options);
+    });
+  }
+
+  self.addEventListener('notificationclick', function (event) {
+    event.notification.close();
+    try {
+      var data = (event.notification && event.notification.data) || {};
+      var targetUrl = data.url || '/';
+      event.waitUntil((async () => {
+        var windowClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+        for (var i = 0; i < windowClients.length; i++) {
+          var client = windowClients[i];
+          if (client.url === targetUrl && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        if (clients.openWindow) {
+          return clients.openWindow(targetUrl);
+        }
+      })());
+    } catch (e) {}
+  });
+} catch (e) {
+  // Silently fail to avoid breaking app if SW bootstrap fails
+}
 
 

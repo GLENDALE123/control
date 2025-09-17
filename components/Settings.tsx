@@ -138,17 +138,9 @@ const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile
             description={theme === 'dark' ? '다크 모드 활성화됨. 눈의 피로를 줄여줍니다.' : '라이트 모드 활성화됨.'}
           >
             <div className="flex items-center gap-3">
-              <ThemeToggle theme={theme} setTheme={setTheme} />
-              <button
-                onClick={() => {
-                  const user = firebase.auth().currentUser;
-                  if (!user) return;
-                  db.collection('users').doc(user.uid).collection('preferences').doc('singleton').set({ theme }, { merge: true }).catch(() => {});
-                }}
-                className="px-3 py-1.5 text-sm rounded-md bg-primary-600 text-white hover:bg-primary-700"
-              >
-                내 테마로 저장
-              </button>
+              <ThemeToggle theme={theme} setTheme={(next) => {
+                setTheme(next);
+              }} />
             </div>
           </SettingRow>
 
@@ -180,9 +172,9 @@ const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile
                         update[`notificationPrefs.${key}`] = next;
                         await db.collection('users').doc(user.uid).collection('preferences').doc('singleton').set(update, { merge: true });
                       }}
-                      className={`w-12 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 ${isOn ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                      className={`w-12 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 ${isOn ? 'bg-green-500 dark:bg-green-600 focus:ring-green-500' : 'bg-slate-300 dark:bg-slate-700 focus:ring-slate-400 dark:focus:ring-slate-500'}`}
                     >
-                      <span className={`block w-5 h-5 bg-white rounded-full shadow transform transition-transform ${isOn ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                      <span className={`block w-5 h-5 bg-white rounded-full shadow transform transition-transform ${isOn ? 'translate-x-0.5' : 'translate-x-6'}`} />
                     </button>
                     <span className="text-sm text-gray-700 dark:text-slate-200">{label}</span>
                   </div>

@@ -537,7 +537,8 @@ const App: React.FC = () => {
     setTheme(newTheme);
     const uid = auth.currentUser?.uid;
     if (!uid) return;
-    db.collection('users').doc(uid).collection('preferences').doc('singleton').set({ theme: newTheme }, { merge: true })
+    db.collection('users').doc(uid).collection('preferences').doc('singleton')
+      .update({ theme: newTheme })
       .catch(error => {
           console.error("Error saving user theme preference:", error);
           addToast({ message: '내 테마 저장에 실패했습니다.', type: 'error' });
