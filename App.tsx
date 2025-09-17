@@ -535,10 +535,12 @@ const App: React.FC = () => {
 
   const handleSetTheme = useCallback((newTheme: Theme) => {
     setTheme(newTheme);
-    db.collection('settings').doc('singleton').set({ globalTheme: newTheme }, { merge: true })
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    db.collection('users').doc(uid).collection('preferences').doc('singleton').set({ theme: newTheme }, { merge: true })
       .catch(error => {
-          console.error("Error saving theme setting:", error);
-          addToast({ message: '테마 설정 저장에 실패했습니다.', type: 'error' });
+          console.error("Error saving user theme preference:", error);
+          addToast({ message: '내 테마 저장에 실패했습니다.', type: 'error' });
       });
   }, [addToast]);
 

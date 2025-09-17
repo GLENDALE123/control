@@ -94,7 +94,7 @@ const ProductionRequestDetail: React.FC<ProductionRequestDetailProps> = ({ reque
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
                     <div className="flex justify-between items-start">
                         <div>
-                            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">화성공장 -> 군포공장 물류이동 List</h2>
+                            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">화성공장 -{'>'} 군포공장 물류이동 List</h2>
                             <p className="text-sm text-gray-500 dark:text-slate-400">{request.requestType}</p>
                         </div>
                         <span className={`px-4 py-2 text-lg font-bold rounded-full ${PRODUCTION_REQUEST_STATUS_COLORS[request.status]}`}>

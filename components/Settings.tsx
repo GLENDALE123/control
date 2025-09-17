@@ -157,7 +157,7 @@ const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile
           <div className="p-4 border dark:border-slate-700 rounded-lg">
             <h3 className="text-lg font-semibold text-gray-700 dark:text-slate-200 mb-2">알림 설정</h3>
             <p className="text-sm text-gray-500 dark:text-slate-400 mb-3">공지는 모든 사용자에게 공통 발송됩니다. 아래에서 나머지 카테고리를 개별 설정할 수 있어요.</p>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4">
               {[
                 { key: 'jig', label: '지그' },
                 { key: 'work', label: '생산' },
@@ -166,22 +166,26 @@ const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile
               ].map(({ key, label }) => {
                 const isOn = (notifPrefs as any)[key] === true;
                 return (
-                  <button
-                    key={key}
-                    onClick={async () => {
-                      const user = firebase.auth().currentUser;
-                      if (!user) return;
-                      const docRef = db.collection('users').doc(user.uid).collection('preferences').doc('singleton');
-                      const next = !isOn;
-                      setNotifPrefs((prev) => ({ ...(prev as any), [key]: next } as any));
-                      const update: any = {};
-                      update[`notificationPrefs.${key}`] = next;
-                      await docRef.set(update, { merge: true });
-                    }}
-                    className={`px-3 py-1.5 text-sm rounded-md border transition-colors dark:border-slate-600 ${isOn ? 'bg-primary-600 text-white border-primary-600 hover:bg-primary-700' : 'bg-transparent text-gray-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                  >
-                    {label} {isOn ? '켜짐' : '꺼짐'}
-                  </button>
+                  <div key={key} className="inline-flex items-center gap-3">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={isOn}
+                      onClick={async () => {
+                        const user = firebase.auth().currentUser;
+                        if (!user) return;
+                        const next = !isOn;
+                        setNotifPrefs((prev) => ({ ...(prev as any), [key]: next } as any));
+                        const update: any = {};
+                        update[`notificationPrefs.${key}`] = next;
+                        await db.collection('users').doc(user.uid).collection('preferences').doc('singleton').set(update, { merge: true });
+                      }}
+                      className={`w-12 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 ${isOn ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                    >
+                      <span className={`block w-5 h-5 bg-white rounded-full shadow transform transition-transform ${isOn ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                    </button>
+                    <span className="text-sm text-gray-700 dark:text-slate-200">{label}</span>
+                  </div>
                 );
               })}
             </div>
