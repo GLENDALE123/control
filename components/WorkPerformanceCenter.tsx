@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, FC, ChangeEvent, useCallback } from 'react';
-import { UserProfile, PackagingReport, PackagedBox, ShortageRequest, HistoryEntry, ProductionRequest, ProductionRequestStatus, ProductionSchedule, Order } from '../types';
+import { UserProfile, PackagingReport, PackagedBox, ShortageRequest, HistoryEntry, ProductionRequest, ProductionRequestStatus, ProductionSchedule, Order, ProcessCoat } from '../types';
 import { db } from '../firebaseConfig';
 import FullScreenModal from './FullScreenModal';
 import ConfirmationModal from './ConfirmationModal';
@@ -609,7 +609,7 @@ const MemoModal: FC<{ content: string; onClose: () => void }> = ({ content, onCl
 );
 
 
-const ReportList: FC<{ reports: PackagingReport[], onEdit: (report: PackagingReport) => void, onDelete: (reportId: string) => void, onShortageRequest: (report: PackagingReport) => void, onSelectShortageDetail: (report: PackagingReport) => void, shortageRequests: ShortageRequest[], currentUserProfile: UserProfile | null }> = ({ reports, onEdit, onDelete, onShortageRequest, onSelectShortageDetail, shortageRequests, currentUserProfile }) => {
+const ReportList: FC<{ reports: PackagingReport[], onEdit: (report: PackagingReport) => void, onDelete: (reportId: string) => void, onShortageRequest: (report: PackagingReport) => void, onSelectShortageDetail: (report: PackagingReport) => void, shortageRequests: ShortageRequest[], currentUserProfile: UserProfile | null, onOpenProcessConditionsModal: (report: PackagingReport) => void }> = ({ reports, onEdit, onDelete, onShortageRequest, onSelectShortageDetail, shortageRequests, currentUserProfile, onOpenProcessConditionsModal }) => {
     const [itemToDelete, setItemToDelete] = useState<PackagingReport | null>(null);
     const [memoToShow, setMemoToShow] = useState<string | null>(null);
 
@@ -646,6 +646,7 @@ const ReportList: FC<{ reports: PackagingReport[], onEdit: (report: PackagingRep
                         <th scope="col" className="px-2 py-3 whitespace-nowrap">불량</th>
                         <th scope="col" className="px-2 py-3 whitespace-nowrap">양품률</th>
                         <th scope="col" className="px-2 py-3 whitespace-nowrap">작성자</th>
+                        <th scope="col" className="px-2 py-3 whitespace-nowrap">공정조건</th>
                         <th scope="col" className="px-2 py-3 whitespace-nowrap">메모</th>
                         <th scope="col" className="px-2 py-3 whitespace-nowrap">작업</th>
                     </tr>
@@ -678,6 +679,18 @@ const ReportList: FC<{ reports: PackagingReport[], onEdit: (report: PackagingRep
                                 <td className="px-2 py-2 text-red-500 dark:text-red-400 whitespace-nowrap text-right">{report.defectQuantity?.toLocaleString()}</td>
                                 <td className="px-2 py-2 whitespace-nowrap text-right">{report.goodQuantity && report.inputQuantity ? ((report.goodQuantity / report.inputQuantity) * 100).toFixed(1) + '%' : ''}</td>
                                 <td className="px-2 py-2 whitespace-nowrap">{report.author.displayName}</td>
+                                <td className="px-2 py-2 whitespace-nowrap text-center">
+                                    <button 
+                                        onClick={() => onOpenProcessConditionsModal(report)} 
+                                        className="w-full text-center hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded p-1 transition-colors"
+                                    >
+                                        {report.processConditions && (Object.values(report.processConditions).some(v => v?.conditions || v?.remarks)) ? (
+                                            <span className="font-bold text-green-500 text-lg">O</span>
+                                        ) : (
+                                            <span className="text-slate-400">-</span>
+                                        )}
+                                    </button>
+                                </td>
                                 <td className="px-2 py-2 whitespace-nowrap text-center">
                                     {report.memo && (
                                         <button onClick={() => setMemoToShow(report.memo!)} className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline">
@@ -868,6 +881,91 @@ const ShortageRequestDetailModal: FC<{
     );
 };
 
+const ProcessConditionsModal: FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    report: PackagingReport | null;
+    onSave: (reportId: string, conditions: PackagingReport['processConditions']) => void;
+    canManage: boolean;
+}> = ({ isOpen, onClose, report, onSave, canManage }) => {
+    const [conditionsData, setConditionsData] = useState<NonNullable<PackagingReport['processConditions']>>({});
+
+    useEffect(() => {
+        if (report) {
+            setConditionsData(report.processConditions || {});
+        }
+    }, [report]);
+
+    const handleChange = (coat: 'undercoat' | 'midcoat' | 'topcoat', field: 'conditions' | 'remarks', value: string) => {
+        setConditionsData(prev => ({
+            ...prev,
+            [coat]: {
+                ...(prev[coat] || { conditions: '', remarks: '' }),
+                [field]: value,
+            },
+        }));
+    };
+
+    const handleSave = () => {
+        if (report) {
+            onSave(report.id, conditionsData);
+        }
+    };
+    
+    if (!report) return null;
+
+    return (
+        <FullScreenModal isOpen={isOpen} onClose={onClose} title={`${report.productName} 공정 조건`}>
+            <div className="p-6 space-y-6">
+                <div className="space-y-4">
+                    <h4 className="text-lg font-semibold">하도</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">작업조건</label>
+                            <textarea value={conditionsData.undercoat?.conditions || ''} onChange={e => handleChange('undercoat', 'conditions', e.target.value)} disabled={!canManage} rows={4} className="mt-1 w-full p-2 border rounded bg-slate-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600"/>
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">특이사항</label>
+                            <textarea value={conditionsData.undercoat?.remarks || ''} onChange={e => handleChange('undercoat', 'remarks', e.target.value)} disabled={!canManage} rows={4} className="mt-1 w-full p-2 border rounded bg-slate-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600"/>
+                        </div>
+                    </div>
+                </div>
+                 <div className="space-y-4">
+                    <h4 className="text-lg font-semibold">중도</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">작업조건</label>
+                            <textarea value={conditionsData.midcoat?.conditions || ''} onChange={e => handleChange('midcoat', 'conditions', e.target.value)} disabled={!canManage} rows={4} className="mt-1 w-full p-2 border rounded bg-slate-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600"/>
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">특이사항</label>
+                            <textarea value={conditionsData.midcoat?.remarks || ''} onChange={e => handleChange('midcoat', 'remarks', e.target.value)} disabled={!canManage} rows={4} className="mt-1 w-full p-2 border rounded bg-slate-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600"/>
+                        </div>
+                    </div>
+                </div>
+                 <div className="space-y-4">
+                    <h4 className="text-lg font-semibold">상도</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">작업조건</label>
+                            <textarea value={conditionsData.topcoat?.conditions || ''} onChange={e => handleChange('topcoat', 'conditions', e.target.value)} disabled={!canManage} rows={4} className="mt-1 w-full p-2 border rounded bg-slate-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600"/>
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">특이사항</label>
+                            <textarea value={conditionsData.topcoat?.remarks || ''} onChange={e => handleChange('topcoat', 'remarks', e.target.value)} disabled={!canManage} rows={4} className="mt-1 w-full p-2 border rounded bg-slate-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600"/>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div className="flex-shrink-0 p-4 border-t dark:border-slate-700 flex justify-end gap-2">
+                <button onClick={onClose} className="bg-slate-200 dark:bg-slate-600 px-4 py-2 rounded-md">취소</button>
+                {canManage && <button onClick={handleSave} className="bg-primary-600 text-white px-4 py-2 rounded-md">저장하기</button>}
+            </div>
+        </FullScreenModal>
+    );
+};
+
+
 // FIX: Changed component to a named export to resolve module resolution issues.
 export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ addToast, currentUserProfile, productionRequests, onOpenNewProductionRequest, onSelectProductionRequest, productionSchedules, onSaveProductionSchedules, onDeleteProductionSchedule, onDeleteProductionSchedulesByDate, orders, onSaveOrders }) => {
     const [activeTab, setActiveTab] = useState<ActiveWorkCenterTab>('reportList');
@@ -880,6 +978,8 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
     const [selectedShortageDetail, setSelectedShortageDetail] = useState<ShortageRequest | null>(null);
     const [itemToDelete, setItemToDelete] = useState<ShortageRequest | null>(null);
     const [isSavingShortage, setIsSavingShortage] = useState(false);
+    const [processConditionsModalState, setProcessConditionsModalState] = useState<{ isOpen: boolean; report: PackagingReport | null }>({ isOpen: false, report: null });
+
 
     // Filter states
     const todayStr = getLocalDateString(new Date());
@@ -1157,6 +1257,23 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
         setEditingReport(null);
         setActiveTab('reportList');
     };
+    
+    const handleOpenProcessConditionsModal = (report: PackagingReport) => {
+        setProcessConditionsModalState({ isOpen: true, report });
+    };
+
+    const handleSaveProcessConditions = async (reportId: string, conditions: PackagingReport['processConditions']) => {
+        try {
+            await db.collection('packaging-reports').doc(reportId).update({
+                processConditions: conditions
+            });
+            addToast({ message: '공정 조건이 저장되었습니다.', type: 'success' });
+            setProcessConditionsModalState({ isOpen: false, report: null });
+        } catch (error) {
+            console.error(error);
+            addToast({ message: '공정 조건 저장에 실패했습니다.', type: 'error' });
+        }
+    };
 
     const tabs: { id: ActiveWorkCenterTab; label: string; icon: React.ReactNode }[] = [
         { id: 'reportList', label: '생산일보', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg> },
@@ -1364,7 +1481,7 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
                         )}
                         
                         <div className="flex-1 overflow-auto bg-white dark:bg-slate-800 rounded-b-lg">
-                             <ReportList reports={filteredReports} onEdit={handleEditReport} onDelete={handleDeleteReport} onShortageRequest={handleOpenNewShortageForm} onSelectShortageDetail={handleSelectShortageDetail} shortageRequests={shortageRequests} currentUserProfile={currentUserProfile} />
+                             <ReportList reports={filteredReports} onEdit={handleEditReport} onDelete={handleDeleteReport} onShortageRequest={handleOpenNewShortageForm} onSelectShortageDetail={handleSelectShortageDetail} shortageRequests={shortageRequests} currentUserProfile={currentUserProfile} onOpenProcessConditionsModal={handleOpenProcessConditionsModal} />
                         </div>
                     </div>
                  )}
@@ -1373,6 +1490,13 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
             </div>
 
              {/* Modals */}
+             <ProcessConditionsModal
+                isOpen={processConditionsModalState.isOpen}
+                onClose={() => setProcessConditionsModalState({ isOpen: false, report: null })}
+                report={processConditionsModalState.report}
+                onSave={handleSaveProcessConditions}
+                canManage={currentUserProfile?.role !== 'Member'}
+            />
              {shortageModalState && (
                 <ShortageRequestModal
                     isOpen={!!shortageModalState}

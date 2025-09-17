@@ -422,6 +422,11 @@ export interface PackagedBox {
     reason?: string;
 }
 
+export interface ProcessCoat {
+    conditions: string;
+    remarks: string;
+}
+
 export interface PackagingReport {
     id: string;
     createdAt: string;
@@ -450,6 +455,11 @@ export interface PackagingReport {
     boxCount?: number;
     remainder?: number;
     packagedBoxes: PackagedBox[];
+    processConditions?: {
+        undercoat?: ProcessCoat;
+        midcoat?: ProcessCoat;
+        topcoat?: ProcessCoat;
+    };
     memo?: string;
     imageUrls?: string[];
 }
