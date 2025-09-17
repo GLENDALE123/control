@@ -42,43 +42,66 @@ export async function initFCM(): Promise<FcmInitResult> {
     // Get token with VAPID key and service worker registration
     const token = await messaging.getToken({ vapidKey: VAPID_PUBLIC_KEY, serviceWorkerRegistration: registration as ServiceWorkerRegistration });
 
+    const saveTokenForUser = async (uid: string, newToken: string) => {
+      try {
+        const userAgent = navigator.userAgent;
+        const language = navigator.language;
+        const tokenRef = db
+          .collection('users')
+          .doc(uid)
+          .collection('fcmTokens')
+          .doc(newToken);
+
+        const previousToken = ((): string | null => {
+          try { return localStorage.getItem('fcmToken'); } catch { return null; }
+        })();
+
+        await tokenRef.set(
+          {
+            token: newToken,
+            platform: 'web',
+            permission,
+            userAgent,
+            language,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            enabled: true,
+          },
+          { merge: true }
+        );
+
+        try { localStorage.setItem('fcmToken', newToken); } catch {}
+
+        // Disable older tokens for this device (same userAgent) to avoid duplicates
+        const snap = await db.collection('users').doc(uid).collection('fcmTokens').get();
+        const batch = db.batch();
+        snap.docs.forEach((doc) => {
+          const data = doc.data() || {};
+          const docToken = doc.id;
+          if (docToken !== newToken && data.userAgent === userAgent && data.enabled !== false) {
+            batch.update(doc.ref, { enabled: false, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+          }
+        });
+        // Also explicitly disable previousToken if present and different
+        if (previousToken && previousToken !== newToken) {
+          const prevRef = db.collection('users').doc(uid).collection('fcmTokens').doc(previousToken);
+          batch.set(prevRef, { enabled: false, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        }
+        await batch.commit();
+      } catch (err) {
+        console.error('Failed to save/rotate FCM token:', err);
+      }
+    };
+
     // Link token to authenticated user when available
     if (token) {
-      const save = async (uid: string) => {
-        try {
-          const userAgent = navigator.userAgent;
-          const language = navigator.language;
-          const tokenRef = db
-            .collection('users')
-            .doc(uid)
-            .collection('fcmTokens')
-            .doc(token);
-          await tokenRef.set(
-            {
-              token,
-              platform: 'web',
-              permission,
-              userAgent,
-              language,
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-              enabled: true,
-            },
-            { merge: true }
-          );
-        } catch (err) {
-          console.error('Failed to save FCM token for user:', err);
-        }
-      };
-
-      // If already signed in, save immediately; otherwise wait for sign-in
       const currentUser = auth.currentUser;
       if (currentUser?.uid) {
-        save(currentUser.uid);
+        saveTokenForUser(currentUser.uid, token);
       } else {
         const unsub = auth.onAuthStateChanged((user) => {
           if (user?.uid) {
-            save(user.uid);
+            saveTokenForUser(user.uid, token);
           }
           unsub();
         });
@@ -98,6 +121,22 @@ export async function initFCM(): Promise<FcmInitResult> {
       // You can hook into your in-app toast system here if desired
       // e.g., toast(`${title}: ${body}`)
     });
+
+    // Token refresh handler (if supported by compat SDK)
+    const anyMessaging: any = messaging as any;
+    if (anyMessaging && typeof anyMessaging.onTokenRefresh === 'function') {
+      anyMessaging.onTokenRefresh(async () => {
+        try {
+          const refreshedToken = await messaging.getToken({ vapidKey: VAPID_PUBLIC_KEY, serviceWorkerRegistration: registration as ServiceWorkerRegistration });
+          const currentUser = auth.currentUser;
+          if (currentUser?.uid && refreshedToken) {
+            await saveTokenForUser(currentUser.uid, refreshedToken);
+          }
+        } catch (e) {
+          console.error('FCM token refresh failed:', e);
+        }
+      });
+    }
 
     return { token, permission };
   } catch (error) {

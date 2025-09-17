@@ -109,6 +109,24 @@ const UserManagement: React.FC<{ currentUserProfile: UserProfile | null }> = ({ 
 
 
 const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile }) => {
+  const [notifPrefs, setNotifPrefs] = useState<{ jig: boolean; work: boolean; quality: boolean; sample: boolean }>({ jig: true, work: true, quality: true, sample: true });
+
+  useEffect(() => {
+    const user = firebase.auth().currentUser;
+    if (!user) return;
+    const prefDocRef = db.collection('users').doc(user.uid).collection('preferences').doc('singleton');
+    const unsubscribe = prefDocRef.onSnapshot((snap) => {
+      const data = (snap.data() as any) || {};
+      setNotifPrefs({
+        jig: data?.notificationPrefs?.jig !== false,
+        work: data?.notificationPrefs?.work !== false,
+        quality: data?.notificationPrefs?.quality !== false,
+        sample: data?.notificationPrefs?.sample !== false,
+      });
+    });
+    return () => unsubscribe();
+  }, []);
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg h-full overflow-auto">
       <div className="p-6">
@@ -145,25 +163,27 @@ const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile
                 { key: 'work', label: '생산' },
                 { key: 'quality', label: '품질' },
                 { key: 'sample', label: '샘플' },
-              ].map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={async () => {
-                    const user = firebase.auth().currentUser;
-                    if (!user) return;
-                    const docRef = db.collection('users').doc(user.uid).collection('preferences').doc('singleton');
-                    const snap = await docRef.get();
-                    const data = snap.exists ? snap.data() || {} : {};
-                    const current = data.notificationPrefs?.[key];
-                    const next = !(current === true);
-                    const update = { notificationPrefs: { ...(data.notificationPrefs || {}), [key]: next } };
-                    await docRef.set(update, { merge: true });
-                  }}
-                  className="px-3 py-1.5 text-sm rounded-md border dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700"
-                >
-                  {label} 토글
-                </button>
-              ))}
+              ].map(({ key, label }) => {
+                const isOn = (notifPrefs as any)[key] === true;
+                return (
+                  <button
+                    key={key}
+                    onClick={async () => {
+                      const user = firebase.auth().currentUser;
+                      if (!user) return;
+                      const docRef = db.collection('users').doc(user.uid).collection('preferences').doc('singleton');
+                      const next = !isOn;
+                      setNotifPrefs((prev) => ({ ...(prev as any), [key]: next } as any));
+                      const update: any = {};
+                      update[`notificationPrefs.${key}`] = next;
+                      await docRef.set(update, { merge: true });
+                    }}
+                    className={`px-3 py-1.5 text-sm rounded-md border transition-colors dark:border-slate-600 ${isOn ? 'bg-primary-600 text-white border-primary-600 hover:bg-primary-700' : 'bg-transparent text-gray-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                  >
+                    {label} {isOn ? '켜짐' : '꺼짐'}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
