@@ -1019,7 +1019,7 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
     const [selectedReportIds, setSelectedReportIds] = useState<Set<string>>(new Set());
     const [isBulkRequestModalOpen, setIsBulkRequestModalOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    const [additionalDetails, setAdditionalDetails] = useState<Record<string, string>>({});
+    const [additionalDetails, setAdditionalDetails] = useState<Record<string, { details: string; destination: string }>>({});
 
     const [prodRequestTypeFilter, setProdRequestTypeFilter] = useState<string>('all');
 
@@ -1335,10 +1335,13 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
         [reports, selectedReportIds]
     );
 
-    const handleAdditionalDetailChange = (reportId: string, value: string) => {
+    const handleAdditionalDetailChange = (reportId: string, field: 'details' | 'destination', value: string) => {
         setAdditionalDetails(prev => ({
             ...prev,
-            [reportId]: value,
+            [reportId]: {
+                ...(prev[reportId] || { details: '', destination: '' }),
+                [field]: value
+            },
         }));
     };
 
@@ -1362,13 +1365,18 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
 
             const content = `통합 벌크 이동 요청 (${selectedReportsForBulk.length}건):\n` +
                 selectedReportsForBulk.map(r => {
-                    const details = additionalDetails[r.id] || '없음';
+                    const details = additionalDetails[r.id]?.details || '없음';
+                    const destination = additionalDetails[r.id]?.destination || '미지정';
                     return `\n---------------------\n` +
                            `- 제품: ${r.productName} / ${r.partName}\n` +
                            `- 발주번호: ${r.orderNumbers.join(', ')}\n` +
                            `- 발주처: ${r.supplier}\n` +
                            `- 사양: ${r.specification}\n` +
-                           `- 수량: ${r.goodQuantity?.toLocaleString()} EA\n` +
+                           `- 양품수량: ${r.goodQuantity?.toLocaleString()} EA\n` +
+                           `- 포장단위: ${r.packagingUnit?.toLocaleString() || '0'}\n` +
+                           `- 박스수량: ${r.boxCount?.toLocaleString() || '0'}\n` +
+                           `- 잔량: ${r.remainder?.toLocaleString() || '0'}\n` +
+                           `- 도착처: ${destination}\n` +
                            `- 추가 요청: ${details}`;
                 }).join('');
 
@@ -1779,12 +1787,12 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
                 onSave={handleSaveProcessConditions}
                 canManage={currentUserProfile?.role !== 'Member'}
             />
-             <FullScreenModal isOpen={isBulkRequestModalOpen} onClose={handleCloseBulkModal} title="물류 이동 리포트 생성">
+             <FullScreenModal isOpen={isBulkRequestModalOpen} onClose={handleCloseBulkModal} title="물류 이동 리포트 생성" maxWidth="max-w-7xl">
                 <div className="h-full flex flex-col">
                     <div className="flex-1 overflow-y-auto p-6">
                         <h3 className="text-lg font-bold mb-4">선택된 생산일보 목록 ({selectedReportsForBulk.length}건)</h3>
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[800px] text-sm">
+                            <table className="w-full min-w-[1200px] text-sm">
                                 <thead className="sticky top-0 bg-white dark:bg-slate-800 z-10">
                                     <tr className="border-b dark:border-slate-700">
                                         <th className="p-2 text-left font-semibold text-gray-600 dark:text-slate-300">발주번호</th>
@@ -1792,6 +1800,10 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
                                         <th className="p-2 text-left font-semibold text-gray-600 dark:text-slate-300">제품명/부속명</th>
                                         <th className="p-2 text-left font-semibold text-gray-600 dark:text-slate-300">사양</th>
                                         <th className="p-2 text-right font-semibold text-gray-600 dark:text-slate-300">양품수량</th>
+                                        <th className="p-2 text-right font-semibold text-gray-600 dark:text-slate-300">포장단위</th>
+                                        <th className="p-2 text-right font-semibold text-gray-600 dark:text-slate-300">박스수량</th>
+                                        <th className="p-2 text-right font-semibold text-gray-600 dark:text-slate-300">잔량</th>
+                                        <th className="p-2 text-left font-semibold text-gray-600 dark:text-slate-300">도착처</th>
                                         <th className="p-2 text-left font-semibold text-gray-600 dark:text-slate-300 w-1/4">추가 요청 내용</th>
                                     </tr>
                                 </thead>
@@ -1803,11 +1815,23 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
                                             <td className="p-2 font-semibold">{report.productName} / {report.partName}</td>
                                             <td className="p-2">{report.specification}</td>
                                             <td className="p-2 text-right">{report.goodQuantity?.toLocaleString()}</td>
+                                            <td className="p-2 text-right">{report.packagingUnit?.toLocaleString()}</td>
+                                            <td className="p-2 text-right">{report.boxCount?.toLocaleString()}</td>
+                                            <td className="p-2 text-right">{report.remainder?.toLocaleString()}</td>
+                                            <td className="p-2">
+                                                <input
+                                                    type="text"
+                                                    value={additionalDetails[report.id]?.destination || ''}
+                                                    onChange={(e) => handleAdditionalDetailChange(report.id, 'destination', e.target.value)}
+                                                    className="w-full p-1 border rounded bg-slate-50 dark:bg-slate-700 border-slate-300 dark:border-slate-600"
+                                                    placeholder="도착처 입력"
+                                                />
+                                            </td>
                                             <td className="p-2">
                                                 <input 
                                                     type="text"
-                                                    value={additionalDetails[report.id] || ''}
-                                                    onChange={(e) => handleAdditionalDetailChange(report.id, e.target.value)}
+                                                    value={additionalDetails[report.id]?.details || ''}
+                                                    onChange={(e) => handleAdditionalDetailChange(report.id, 'details', e.target.value)}
                                                     className="w-full p-1 border rounded bg-slate-50 dark:bg-slate-700 border-slate-300 dark:border-slate-600"
                                                     placeholder="추가 요청사항 입력"
                                                 />

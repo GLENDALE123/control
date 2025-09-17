@@ -42,7 +42,11 @@ const parseLogisticsContent = (content: string) => {
             orderNumber: data['발주번호'] || '',
             supplier: data['발주처'] || '',
             specification: data['사양'] || '',
-            quantity: data['수량'] || '',
+            quantity: data['양품수량'] || data['수량'] || '',
+            packagingUnit: data['포장단위'] || '',
+            boxCount: data['박스수량'] || '',
+            remainder: data['잔량'] || '',
+            destination: data['도착처'] || '',
             details: data['추가 요청'] || '없음',
         };
     });
@@ -90,7 +94,7 @@ const ProductionRequestDetail: React.FC<ProductionRequestDetailProps> = ({ reque
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
                     <div className="flex justify-between items-start">
                         <div>
-                            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{request.productName} ({request.partName})</h2>
+                            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">화성공장 -> 군포공장 물류이동 List</h2>
                             <p className="text-sm text-gray-500 dark:text-slate-400">{request.requestType}</p>
                         </div>
                         <span className={`px-4 py-2 text-lg font-bold rounded-full ${PRODUCTION_REQUEST_STATUS_COLORS[request.status]}`}>
@@ -107,38 +111,40 @@ const ProductionRequestDetail: React.FC<ProductionRequestDetailProps> = ({ reque
 
                     <div className="space-y-4">
                         <h3 className="text-xl font-semibold text-gray-800 dark:text-white">요청 항목 상세</h3>
-                        {parsedContent?.map((item, index) => (
-                            <div key={index} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg shadow-sm">
-                                <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
-                                    {/* Row 1 */}
-                                    <div className="text-lg">
-                                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">발주번호</p>
-                                        <p className="font-semibold">{item.orderNumber}</p>
-                                    </div>
-                                    <div className="text-lg">
-                                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">발주처</p>
-                                        <p>{item.supplier}</p>
-                                    </div>
-                                    <div className="text-lg">
-                                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">제품/부속명</p>
-                                        <p>{item.product}</p>
-                                    </div>
-                                    {/* Row 2 */}
-                                    <div className="text-lg pt-3 border-t dark:border-slate-700 md:border-none md:pt-0">
-                                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">사양</p>
-                                        <p>{item.specification}</p>
-                                    </div>
-                                    <div className="text-lg pt-3 border-t dark:border-slate-700 md:border-none md:pt-0">
-                                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">요청수량</p>
-                                        <p className="font-bold">{item.quantity}</p>
-                                    </div>
-                                    <div className="text-lg pt-3 border-t dark:border-slate-700 md:border-none md:pt-0">
-                                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">추가 요청 내용</p>
-                                        <p className="whitespace-pre-wrap">{item.details}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left text-gray-500 dark:text-slate-400">
+                                <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-slate-700 dark:text-slate-400">
+                                    <tr>
+                                        <th scope="col" className="px-4 py-3">발주번호</th>
+                                        <th scope="col" className="px-4 py-3">발주처</th>
+                                        <th scope="col" className="px-4 py-3">제품/부속명</th>
+                                        <th scope="col" className="px-4 py-3">사양</th>
+                                        <th scope="col" className="px-4 py-3 text-right">양품수량</th>
+                                        <th scope="col" className="px-4 py-3 text-right">포장단위</th>
+                                        <th scope="col" className="px-4 py-3 text-right">박스수량</th>
+                                        <th scope="col" className="px-4 py-3 text-right">잔량</th>
+                                        <th scope="col" className="px-4 py-3">도착처</th>
+                                        <th scope="col" className="px-4 py-3">추가 요청 내용</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {parsedContent?.map((item, index) => (
+                                        <tr key={index} className="bg-white border-b dark:bg-slate-800 dark:border-slate-700">
+                                            <td className="px-4 py-2 font-mono text-xs">{item.orderNumber}</td>
+                                            <td className="px-4 py-2">{item.supplier}</td>
+                                            <td className="px-4 py-2 font-medium text-gray-900 dark:text-white">{item.product}</td>
+                                            <td className="px-4 py-2">{item.specification}</td>
+                                            <td className="px-4 py-2 text-right">{item.quantity}</td>
+                                            <td className="px-4 py-2 text-right">{item.packagingUnit}</td>
+                                            <td className="px-4 py-2 text-right">{item.boxCount}</td>
+                                            <td className="px-4 py-2 text-right">{item.remainder}</td>
+                                            <td className="px-4 py-2">{item.destination}</td>
+                                            <td className="px-4 py-2 whitespace-pre-wrap">{item.details}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 
                     <div className="mt-6 border-t dark:border-slate-700 pt-4">
