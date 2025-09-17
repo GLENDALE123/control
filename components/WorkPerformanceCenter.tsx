@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, FC, ChangeEvent, useCallback } from 'react';
-import { UserProfile, PackagingReport, PackagedBox, ShortageRequest, HistoryEntry, ProductionRequest, ProductionRequestStatus, ProductionSchedule, Order, ProcessCoat } from '../types';
+import { UserProfile, PackagingReport, PackagedBox, ShortageRequest, HistoryEntry, ProductionRequest, ProductionRequestStatus, ProductionSchedule, Order, ProcessCoat, ProductionRequestType } from '../types';
 import { db } from '../firebaseConfig';
 import FullScreenModal from './FullScreenModal';
 import ConfirmationModal from './ConfirmationModal';
@@ -391,7 +391,7 @@ const PackagingFormSection: FC<{
     };
     
     const handleOrderNumberChange = (index: number, value: string) => {
-        const numericPart = value.replace(/^T/i, '').replace(/[^0-9]/g, '');
+        const numericPart = value.replace(/^T/i, '').replace(/[^0-9-]/g, '');
         
         let formatted = 'T';
         if (numericPart.length > 0) {
@@ -609,9 +609,22 @@ const MemoModal: FC<{ content: string; onClose: () => void }> = ({ content, onCl
 );
 
 
-const ReportList: FC<{ reports: PackagingReport[], onEdit: (report: PackagingReport) => void, onDelete: (reportId: string) => void, onShortageRequest: (report: PackagingReport) => void, onSelectShortageDetail: (report: PackagingReport) => void, shortageRequests: ShortageRequest[], currentUserProfile: UserProfile | null, onOpenProcessConditionsModal: (report: PackagingReport) => void }> = ({ reports, onEdit, onDelete, onShortageRequest, onSelectShortageDetail, shortageRequests, currentUserProfile, onOpenProcessConditionsModal }) => {
+const ReportList: FC<{ reports: PackagingReport[], onEdit: (report: PackagingReport) => void, onDelete: (reportId: string) => void, onShortageRequest: (report: PackagingReport) => void, onSelectShortageDetail: (report: PackagingReport) => void, shortageRequests: ShortageRequest[], currentUserProfile: UserProfile | null, onOpenProcessConditionsModal: (report: PackagingReport) => void, productionRequests: ProductionRequest[], onSelectProductionRequest: (request: ProductionRequest) => void, onToggleReportSelection: (id: string) => void, selectedReportIds: Set<string>, handleSelectAllOnPage: () => void, areAllOnPageSelected: boolean }> = ({ reports, onEdit, onDelete, onShortageRequest, onSelectShortageDetail, shortageRequests, currentUserProfile, onOpenProcessConditionsModal, productionRequests, onSelectProductionRequest, onToggleReportSelection, selectedReportIds, handleSelectAllOnPage, areAllOnPageSelected }) => {
     const [itemToDelete, setItemToDelete] = useState<PackagingReport | null>(null);
     const [memoToShow, setMemoToShow] = useState<string | null>(null);
+
+    const logisticsRequestsBySourceId = useMemo(() => {
+        const map = new Map<string, ProductionRequest>();
+        productionRequests.forEach(req => {
+            if (req.requestType === ProductionRequestType.LogisticsTransfer && req.sourceReportIds) {
+                req.sourceReportIds.forEach(id => {
+                    map.set(id, req);
+                });
+            }
+        });
+        return map;
+    }, [productionRequests]);
+
 
     const handleDeleteClick = (report: PackagingReport) => {
         setItemToDelete(report);
@@ -649,6 +662,12 @@ const ReportList: FC<{ reports: PackagingReport[], onEdit: (report: PackagingRep
                         <th scope="col" className="px-2 py-3 whitespace-nowrap">공정조건</th>
                         <th scope="col" className="px-2 py-3 whitespace-nowrap">메모</th>
                         <th scope="col" className="px-2 py-3 whitespace-nowrap">작업</th>
+                         <th scope="col" className="px-2 py-3 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                                <input type="checkbox" checked={areAllOnPageSelected} onChange={handleSelectAllOnPage} className="form-checkbox h-4 w-4 rounded text-primary-600 focus:ring-primary-500 bg-slate-200 dark:bg-slate-700 border-slate-400 dark:border-slate-500" />
+                                <span>물류이동</span>
+                            </div>
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -656,6 +675,7 @@ const ReportList: FC<{ reports: PackagingReport[], onEdit: (report: PackagingRep
                         const status = report.endTime ? '생산완료' : (report.startTime ? '작업중' : '대기');
                         const statusColor = report.endTime ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200' : (report.startTime ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300');
                         const hasShortageRequest = shortageRequests.some(sr => sr.sourceReportId === report.id);
+                        const logisticsRequest = logisticsRequestsBySourceId.get(report.id);
                         return (
                             <tr key={report.id} className="bg-white border-b dark:bg-slate-800 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700">
                                 <td className="px-2 py-2 whitespace-nowrap">{report.workDate}</td>
@@ -705,6 +725,23 @@ const ReportList: FC<{ reports: PackagingReport[], onEdit: (report: PackagingRep
                                         <button onClick={() => onSelectShortageDetail(report)} className="text-xs font-semibold text-green-500 hover:underline cursor-pointer">신청완료</button>
                                     ) : (
                                         <button onClick={() => onShortageRequest(report)} className="font-medium text-purple-600 dark:text-purple-500 hover:underline">부족분신청</button>
+                                    )}
+                                </td>
+                                 <td className="px-2 py-2 whitespace-nowrap text-center">
+                                    {logisticsRequest ? (
+                                        <button
+                                            onClick={() => onSelectProductionRequest(logisticsRequest)}
+                                            className="text-sm font-semibold text-green-600 dark:text-green-400 hover:underline"
+                                        >
+                                            리포트보기
+                                        </button>
+                                    ) : (
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedReportIds.has(report.id)}
+                                            onChange={() => onToggleReportSelection(report.id)}
+                                            className="form-checkbox h-4 w-4 rounded text-primary-600 focus:ring-primary-500 bg-slate-200 dark:bg-slate-700 border-slate-400 dark:border-slate-500"
+                                        />
                                     )}
                                 </td>
                             </tr>
@@ -965,7 +1002,6 @@ const ProcessConditionsModal: FC<{
     );
 };
 
-
 // FIX: Changed component to a named export to resolve module resolution issues.
 export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ addToast, currentUserProfile, productionRequests, onOpenNewProductionRequest, onSelectProductionRequest, productionSchedules, onSaveProductionSchedules, onDeleteProductionSchedule, onDeleteProductionSchedulesByDate, orders, onSaveOrders }) => {
     const [activeTab, setActiveTab] = useState<ActiveWorkCenterTab>('reportList');
@@ -979,6 +1015,13 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
     const [itemToDelete, setItemToDelete] = useState<ShortageRequest | null>(null);
     const [isSavingShortage, setIsSavingShortage] = useState(false);
     const [processConditionsModalState, setProcessConditionsModalState] = useState<{ isOpen: boolean; report: PackagingReport | null }>({ isOpen: false, report: null });
+    
+    const [selectedReportIds, setSelectedReportIds] = useState<Set<string>>(new Set());
+    const [isBulkRequestModalOpen, setIsBulkRequestModalOpen] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [additionalDetails, setAdditionalDetails] = useState<Record<string, string>>({});
+
+    const [prodRequestTypeFilter, setProdRequestTypeFilter] = useState<string>('all');
 
 
     // Filter states
@@ -1274,6 +1317,175 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
             addToast({ message: '공정 조건 저장에 실패했습니다.', type: 'error' });
         }
     };
+    
+    const handleToggleReportSelection = (reportId: string) => {
+        setSelectedReportIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(reportId)) {
+                newSet.delete(reportId);
+            } else {
+                newSet.add(reportId);
+            }
+            return newSet;
+        });
+    };
+
+    const selectedReportsForBulk = useMemo(() => 
+        reports.filter(r => selectedReportIds.has(r.id)), 
+        [reports, selectedReportIds]
+    );
+
+    const handleAdditionalDetailChange = (reportId: string, value: string) => {
+        setAdditionalDetails(prev => ({
+            ...prev,
+            [reportId]: value,
+        }));
+    };
+
+    const handleCloseBulkModal = () => {
+        setIsBulkRequestModalOpen(false);
+        setAdditionalDetails({});
+    };
+
+    const handleConfirmBulkRequest = async () => {
+        if (!currentUserProfile || selectedReportsForBulk.length === 0) return;
+
+        setIsSaving(true);
+        addToast({ message: "통합 물류 이동 요청을 생성하는 중...", type: 'info' });
+
+        try {
+            const totalQuantity = selectedReportsForBulk.reduce((sum, r) => sum + (r.goodQuantity || 0), 0);
+            const productNames = [...new Set(selectedReportsForBulk.map(r => r.productName))];
+            const partNames = [...new Set(selectedReportsForBulk.map(r => r.partName))];
+            const suppliers = [...new Set(selectedReportsForBulk.map(r => r.supplier))];
+            const orderNumbers = [...new Set(selectedReportsForBulk.flatMap(r => r.orderNumbers))];
+
+            const content = `통합 벌크 이동 요청 (${selectedReportsForBulk.length}건):\n` +
+                selectedReportsForBulk.map(r => {
+                    const details = additionalDetails[r.id] || '없음';
+                    return `\n---------------------\n` +
+                           `- 제품: ${r.productName} / ${r.partName}\n` +
+                           `- 발주번호: ${r.orderNumbers.join(', ')}\n` +
+                           `- 발주처: ${r.supplier}\n` +
+                           `- 사양: ${r.specification}\n` +
+                           `- 수량: ${r.goodQuantity?.toLocaleString()} EA\n` +
+                           `- 추가 요청: ${details}`;
+                }).join('');
+
+            const counterRef = db.collection('counters').doc('production-requests-counter');
+            const today = new Date();
+            const dateString = `${today.getFullYear().toString().slice(-2)}${(today.getMonth() + 1).toString().padStart(2, '0')}${today.getDate().toString().padStart(2, '0')}`;
+
+            const newId = await db.runTransaction(async (transaction) => {
+                const counterDoc = await transaction.get(counterRef);
+                const newCount = (counterDoc.data()?.count || 0) + 1;
+                const generatedId = `P-${dateString}-${newCount.toString().padStart(3, '0')}`;
+                
+                const newRequestRef = db.collection('production-requests').doc(generatedId);
+                
+                const newRequestPayload: Omit<ProductionRequest, 'id'> = {
+                    createdAt: new Date().toISOString(),
+                    author: { uid: currentUserProfile.uid, displayName: currentUserProfile.displayName },
+                    status: ProductionRequestStatus.Requested,
+                    history: [{ status: ProductionRequestStatus.Requested, date: new Date().toISOString(), user: currentUserProfile.displayName, reason: '통합 벌크 이동 요청으로 생성됨' }],
+                    requestType: ProductionRequestType.LogisticsTransfer,
+                    requester: currentUserProfile.displayName,
+                    orderNumber: orderNumbers.join(', '),
+                    productName: productNames.length > 1 ? `${productNames[0]} 외 ${productNames.length - 1}건` : productNames[0],
+                    partName: partNames.join(', '),
+                    supplier: suppliers.join(', '),
+                    quantity: totalQuantity,
+                    content: content,
+                    sourceReportIds: selectedReportsForBulk.map(r => r.id)
+                };
+                
+                transaction.set(newRequestRef, newRequestPayload);
+                transaction.set(counterRef, { count: newCount });
+                return generatedId;
+            });
+            
+            await db.collection('notifications').add({
+                message: `신규 통합 물류이동 요청이 등록되었습니다.`,
+                date: new Date().toISOString(),
+                requestId: newId,
+                readBy: [],
+                type: 'work',
+            });
+            
+            addToast({ message: "통합 물류이동 요청이 등록되었습니다.", type: 'success' });
+            handleCloseBulkModal();
+            setSelectedReportIds(new Set());
+
+        } catch (error) {
+            console.error("Error saving bulk logistics request:", error);
+            addToast({ message: "요청 저장에 실패했습니다.", type: "error" });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+    
+    const areAllOnPageSelected = useMemo(() => {
+        const currentPageIds = new Set(filteredReports.map(r => r.id));
+        if (currentPageIds.size === 0) return false;
+        return Array.from(currentPageIds).every(id => selectedReportIds.has(id));
+    }, [filteredReports, selectedReportIds]);
+    
+    const handleSelectAllOnPage = () => {
+        const logisticsRequestsBySourceId = new Map<string, ProductionRequest>();
+        productionRequests.forEach(req => {
+            if (req.requestType === ProductionRequestType.LogisticsTransfer && req.sourceReportIds) {
+                req.sourceReportIds.forEach(id => {
+                    logisticsRequestsBySourceId.set(id, req);
+                });
+            }
+        });
+
+        const unrequestedIdsOnPage = filteredReports
+            .map(r => r.id)
+            .filter(id => !logisticsRequestsBySourceId.has(id));
+
+        setSelectedReportIds(prev => {
+            const newSet = new Set(prev);
+            const allSelected = unrequestedIdsOnPage.every(id => newSet.has(id));
+            
+            if (allSelected) {
+                unrequestedIdsOnPage.forEach(id => newSet.delete(id));
+            } else {
+                unrequestedIdsOnPage.forEach(id => newSet.add(id));
+            }
+            return newSet;
+        });
+    };
+    
+    const filteredProdRequests = useMemo(() => {
+        if (prodRequestTypeFilter === 'all') return productionRequests;
+        return productionRequests.filter(req => req.requestType === prodRequestTypeFilter);
+    }, [productionRequests, prodRequestTypeFilter]);
+
+    const handleBulkUpdateStatus = useCallback(async (ids: string[], status: ProductionRequestStatus, reason?: string) => {
+        if (!currentUserProfile || ids.length === 0) return;
+        
+        addToast({ message: `${ids.length}건의 상태를 업데이트하는 중...`, type: 'info' });
+        
+        const historyEntry: HistoryEntry = { status, date: new Date().toISOString(), user: currentUserProfile.displayName, reason: reason || '상태 업데이트됨' };
+    
+        const batch = db.batch();
+        ids.forEach(id => {
+            const docRef = db.collection('production-requests').doc(id);
+            batch.update(docRef, {
+                status: status,
+                history: firebase.firestore.FieldValue.arrayUnion(historyEntry)
+            });
+        });
+    
+        try {
+            await batch.commit();
+            addToast({ message: `${ids.length}건의 상태가 성공적으로 업데이트되었습니다.`, type: 'success' });
+        } catch (error) {
+            console.error("Error updating statuses in bulk:", error);
+            addToast({ message: '상태 업데이트에 실패했습니다.', type: 'error' });
+        }
+    }, [currentUserProfile, addToast]);
 
     const tabs: { id: ActiveWorkCenterTab; label: string; icon: React.ReactNode }[] = [
         { id: 'reportList', label: '생산일보', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg> },
@@ -1315,19 +1527,27 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
                  {activeTab === 'reportForm' && <PackagingFormSection addToast={addToast} currentUserProfile={currentUserProfile} existingReport={editingReport} onSaveComplete={handleSaveComplete} onCancelEdit={handleCancelEdit} />}
                  {activeTab === 'prodMgmt' && (
                     <div className="h-full flex flex-col bg-white dark:bg-slate-800 rounded-lg shadow-sm p-4">
-                        <header className="flex-shrink-0 mb-4 flex justify-between items-center">
+                        <header className="flex-shrink-0 mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <h3 className="text-lg font-bold text-gray-800 dark:text-white">생산관리부 요청사항</h3>
-                            {currentUserProfile?.role !== 'Member' && (
-                                <button 
-                                    onClick={onOpenNewProductionRequest} 
-                                    className="bg-primary-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-primary-700"
-                                >
-                                    신규 요청
-                                </button>
-                            )}
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1 bg-gray-200 dark:bg-slate-700 p-1 rounded-lg text-xs">
+                                    <button onClick={() => setProdRequestTypeFilter('all')} className={`px-2 py-1 rounded ${prodRequestTypeFilter === 'all' ? 'bg-white dark:bg-slate-600 shadow' : ''}`}>전체</button>
+                                    {Object.values(ProductionRequestType).map(type => (
+                                        <button key={type} onClick={() => setProdRequestTypeFilter(type)} className={`px-2 py-1 rounded ${prodRequestTypeFilter === type ? 'bg-white dark:bg-slate-600 shadow' : ''}`}>{type}</button>
+                                    ))}
+                                </div>
+                                {currentUserProfile?.role !== 'Member' && (
+                                    <button 
+                                        onClick={onOpenNewProductionRequest} 
+                                        className="bg-primary-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-primary-700"
+                                    >
+                                        신규 요청
+                                    </button>
+                                )}
+                            </div>
                         </header>
                         <main className="flex-1 overflow-y-auto">
-                            {productionRequests.length > 0 ? (
+                            {filteredProdRequests.length > 0 ? (
                                 <table className="w-full min-w-max text-sm text-left text-gray-500 dark:text-slate-400">
                                     <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-slate-700 dark:text-slate-400 sticky top-0 z-10">
                                         <tr>
@@ -1343,15 +1563,28 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {productionRequests.map(req => {
+                                        {filteredProdRequests.map(req => {
                                             const hasUnreadComments = currentUserProfile && req.comments?.some(c => !c.readBy?.includes(currentUserProfile.uid));
                                             return (
                                                 <tr key={req.id} onClick={() => onSelectProductionRequest(req)} className="bg-white border-b dark:bg-slate-800 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
                                                     <td className="px-2 py-2 text-xs">{new Date(req.createdAt).toLocaleString('ko-KR')}</td>
                                                     <td className="px-2 py-2">{req.requestType}</td>
-                                                    <td className="px-2 py-2"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${PRODUCTION_REQUEST_STATUS_COLORS[req.status]}`}>{req.status}</span></td>
+                                                    <td className="px-2 py-2"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${PRODUCTION_REQUEST_STATUS_COLORS[req.status]}`}>{req.status === ProductionRequestStatus.InProgress && req.requestType === ProductionRequestType.LogisticsTransfer ? '물류이동중' : req.status}</span></td>
                                                     <td className="px-2 py-2">{req.requester}</td>
-                                                    <td className="px-2 py-2 font-mono text-xs">{req.orderNumber}</td>
+                                                    <td className="px-2 py-2 font-mono text-xs">
+                                                        {req.requestType === ProductionRequestType.LogisticsTransfer
+                                                            ? (
+                                                                (() => {
+                                                                    const orderNumbers = req.orderNumber.split(',').map(s => s.trim()).filter(Boolean);
+                                                                    if (orderNumbers.length > 1) {
+                                                                        return `${orderNumbers[0]} 외 ${orderNumbers.length - 1}건`;
+                                                                    }
+                                                                    return req.orderNumber;
+                                                                })()
+                                                            )
+                                                            : req.orderNumber
+                                                        }
+                                                    </td>
                                                     <td className="px-2 py-2">{req.supplier}</td>
                                                     <td className="px-2 py-2 font-semibold text-gray-900 dark:text-white">{req.productName} ({req.partName})</td>
                                                     <td className="px-2 py-2 text-right">{req.quantity.toLocaleString()}</td>
@@ -1443,6 +1676,19 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
                                 </div>
                             )}
                         </div>
+                        {selectedReportIds.size > 0 && (
+                            <div className="flex-shrink-0 p-3 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-between animate-fade-in-down">
+                                <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">{selectedReportIds.size}개 항목 선택됨</span>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => setSelectedReportIds(new Set())} className="px-3 py-1.5 text-sm font-medium rounded-md bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200">
+                                        선택 해제
+                                    </button>
+                                    <button onClick={() => setIsBulkRequestModalOpen(true)} className="px-3 py-1.5 text-sm font-medium rounded-md bg-blue-600 text-white">
+                                        선택 항목으로 리포트 생성
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         {summaryData && (
                             <div className="flex-shrink-0 p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
@@ -1481,53 +1727,122 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
                         )}
                         
                         <div className="flex-1 overflow-auto bg-white dark:bg-slate-800 rounded-b-lg">
-                             <ReportList reports={filteredReports} onEdit={handleEditReport} onDelete={handleDeleteReport} onShortageRequest={handleOpenNewShortageForm} onSelectShortageDetail={handleSelectShortageDetail} shortageRequests={shortageRequests} currentUserProfile={currentUserProfile} onOpenProcessConditionsModal={handleOpenProcessConditionsModal} />
+                             <ReportList reports={filteredReports} onEdit={handleEditReport} onDelete={handleDeleteReport} onShortageRequest={handleOpenNewShortageForm} onSelectShortageDetail={handleSelectShortageDetail} shortageRequests={shortageRequests} currentUserProfile={currentUserProfile} onOpenProcessConditionsModal={handleOpenProcessConditionsModal} productionRequests={productionRequests} onSelectProductionRequest={onSelectProductionRequest} selectedReportIds={selectedReportIds} onToggleReportSelection={handleToggleReportSelection} handleSelectAllOnPage={handleSelectAllOnPage} areAllOnPageSelected={areAllOnPageSelected}/>
                         </div>
                     </div>
-                 )}
-                 {activeTab === 'scheduleList' && <ProductionScheduleList schedules={productionSchedules} onSave={onSaveProductionSchedules} onDelete={onDeleteProductionSchedule} onDeleteByDate={onDeleteProductionSchedulesByDate} currentUserProfile={currentUserProfile} />}
-                 {activeTab === 'orderList' && <OrderRegistrationList orders={orders} onSave={onSaveOrders} currentUserProfile={currentUserProfile}/>}
+                )}
+                {activeTab === 'scheduleList' && (
+                    <ProductionScheduleList schedules={productionSchedules} onSave={onSaveProductionSchedules} onDelete={onDeleteProductionSchedule} onDeleteByDate={onDeleteProductionSchedulesByDate} currentUserProfile={currentUserProfile} />
+                )}
+                {activeTab === 'orderList' && (
+                    <OrderRegistrationList orders={orders} onSave={onSaveOrders} currentUserProfile={currentUserProfile} />
+                )}
             </div>
 
-             {/* Modals */}
-             <ProcessConditionsModal
-                isOpen={processConditionsModalState.isOpen}
-                onClose={() => setProcessConditionsModalState({ isOpen: false, report: null })}
-                report={processConditionsModalState.report}
-                onSave={handleSaveProcessConditions}
-                canManage={currentUserProfile?.role !== 'Member'}
-            />
-             {shortageModalState && (
-                <ShortageRequestModal
+            {shortageModalState && (
+                <ShortageRequestModal 
                     isOpen={!!shortageModalState}
                     onClose={() => setShortageModalState(null)}
                     report={shortageModalState.report}
-                    existingRequest={shortageModalState.mode === 'edit' ? shortageModalState.request : undefined}
+                    existingRequest={shortageModalState.request}
                     onSave={handleSaveShortageRequest}
                     isSaving={isSavingShortage}
                 />
             )}
-            {selectedShortageDetail && (
+            
+             {selectedShortageDetail && (
                 <ShortageRequestDetailModal
                     isOpen={!!selectedShortageDetail}
                     onClose={() => setSelectedShortageDetail(null)}
                     request={selectedShortageDetail}
                     onEdit={handleOpenEditShortageForm}
                     onDelete={() => {
-                        if (selectedShortageDetail) {
-                            setItemToDelete(selectedShortageDetail);
-                        }
+                        setItemToDelete(selectedShortageDetail);
+                        setSelectedShortageDetail(null);
                     }}
                     currentUserProfile={currentUserProfile}
                 />
             )}
+            
             <ConfirmationModal
                 isOpen={!!itemToDelete}
                 onClose={() => setItemToDelete(null)}
                 onConfirm={handleDeleteShortageRequest}
-                title="부족분 신청 삭제 확인"
+                title="신청 삭제 확인"
                 message={`'${itemToDelete?.productName}' 부족분 신청 내역을 정말 삭제하시겠습니까?`}
             />
+
+            <ProcessConditionsModal
+                isOpen={processConditionsModalState.isOpen}
+                onClose={() => setProcessConditionsModalState({ isOpen: false, report: null })}
+                report={processConditionsModalState.report}
+                onSave={handleSaveProcessConditions}
+                canManage={currentUserProfile?.role !== 'Member'}
+            />
+             <FullScreenModal isOpen={isBulkRequestModalOpen} onClose={handleCloseBulkModal} title="물류 이동 리포트 생성">
+                <div className="h-full flex flex-col">
+                    <div className="flex-1 overflow-y-auto p-6">
+                        <h3 className="text-lg font-bold mb-4">선택된 생산일보 목록 ({selectedReportsForBulk.length}건)</h3>
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[800px] text-sm">
+                                <thead className="sticky top-0 bg-white dark:bg-slate-800 z-10">
+                                    <tr className="border-b dark:border-slate-700">
+                                        <th className="p-2 text-left font-semibold text-gray-600 dark:text-slate-300">발주번호</th>
+                                        <th className="p-2 text-left font-semibold text-gray-600 dark:text-slate-300">발주처</th>
+                                        <th className="p-2 text-left font-semibold text-gray-600 dark:text-slate-300">제품명/부속명</th>
+                                        <th className="p-2 text-left font-semibold text-gray-600 dark:text-slate-300">사양</th>
+                                        <th className="p-2 text-right font-semibold text-gray-600 dark:text-slate-300">양품수량</th>
+                                        <th className="p-2 text-left font-semibold text-gray-600 dark:text-slate-300 w-1/4">추가 요청 내용</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {selectedReportsForBulk.map(report => (
+                                        <tr key={report.id} className="border-t dark:border-slate-700">
+                                            <td className="p-2 font-mono text-xs">{report.orderNumbers.join(', ')}</td>
+                                            <td className="p-2">{report.supplier}</td>
+                                            <td className="p-2 font-semibold">{report.productName} / {report.partName}</td>
+                                            <td className="p-2">{report.specification}</td>
+                                            <td className="p-2 text-right">{report.goodQuantity?.toLocaleString()}</td>
+                                            <td className="p-2">
+                                                <input 
+                                                    type="text"
+                                                    value={additionalDetails[report.id] || ''}
+                                                    onChange={(e) => handleAdditionalDetailChange(report.id, e.target.value)}
+                                                    className="w-full p-1 border rounded bg-slate-50 dark:bg-slate-700 border-slate-300 dark:border-slate-600"
+                                                    placeholder="추가 요청사항 입력"
+                                                />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div className="flex-shrink-0 p-4 border-t dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+                        <div className="flex justify-between items-center w-full">
+                            <div className="text-lg font-bold">
+                                총 수량: {selectedReportsForBulk.reduce((sum, r) => sum + (r.goodQuantity || 0), 0).toLocaleString()} EA
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={handleCloseBulkModal} className="bg-slate-200 dark:bg-slate-600 px-4 py-2 rounded-md">취소</button>
+                                <button onClick={handleConfirmBulkRequest} disabled={isSaving} className="bg-primary-600 text-white px-4 py-2 rounded-md disabled:opacity-50">
+                                    {isSaving ? '생성 중...' : '리포트 생성'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </FullScreenModal>
+
+            <style>{`
+                @keyframes fade-in-down {
+                  from { opacity: 0; transform: translateY(-10px); }
+                  to { opacity: 1; transform: translateY(0); }
+                }
+                .animate-fade-in-down {
+                  animation: fade-in-down 0.3s ease-out forwards;
+                }
+            `}</style>
         </div>
     );
 };

@@ -1834,6 +1834,13 @@ const App: React.FC = () => {
     }
   };
 
+  const getModalMaxWidth = () => {
+    if (modal.view === 'productionRequestDetail' && (modal.data as ProductionRequest)?.requestType === ProductionRequestType.LogisticsTransfer) {
+        return 'max-w-[96rem]';
+    }
+    return 'max-w-5xl';
+  };
+
   const autocompleteJigData = useMemo(() => ({
       itemNames: [...new Set(requests.map(r => r.itemName).filter(Boolean))],
       partNames: [...new Set(requests.map(r => r.partName).filter(Boolean))],
@@ -2030,6 +2037,7 @@ const App: React.FC = () => {
             isOpen={modal.view !== null}
             onClose={handleCloseModal}
             title={getModalTitle()}
+            maxWidth={getModalMaxWidth()}
         >
             {modal.view === 'requestForm' && (
                 <RequestForm onSave={handleSaveRequest} onCancel={handleCloseModal} existingRequest={modal.data} masterData={masterData} />

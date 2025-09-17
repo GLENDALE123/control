@@ -1,4 +1,3 @@
-
 import React, { useState, FC, ChangeEvent, FormEvent, useRef, useEffect } from 'react';
 import { ProductionRequest, ProductionRequestType, UserProfile } from '../types';
 
@@ -68,7 +67,7 @@ const ProductionRequestForm: FC<ProductionRequestFormProps> = ({ onSave, onCance
     
     const inputClasses = "mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700";
     const labelClasses = "block text-sm font-medium text-gray-700 dark:text-slate-300";
-    const requestTypeOptions = Object.values(ProductionRequestType);
+    const requestTypeOptions = Object.values(ProductionRequestType).filter(type => type !== ProductionRequestType.LogisticsTransfer);
 
     return (
         <div className="h-full flex flex-col">
