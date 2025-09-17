@@ -43,8 +43,8 @@ const QualityIssueForm: React.FC<{
 
     const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            const files = Array.from(e.target.files);
-            const newPreviews = files.map(file => URL.createObjectURL(file));
+            const files: File[] = Array.from(e.target.files as FileList);
+            const newPreviews = files.map((file: File) => URL.createObjectURL(file));
             setImageFiles(prev => [...prev, ...files]);
             setImagePreviews(prev => [...prev, ...newPreviews]);
         }

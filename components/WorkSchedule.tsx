@@ -74,7 +74,8 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth();
 
-        let query: firebase.firestore.Query = db.collection('work-schedules');
+        // Use any to avoid compat namespace type mismatch in TS without modular SDK types
+        let query: any = db.collection('work-schedules');
 
         if (view === 'month') {
             const endDate = new Date(year, month + 1, 0).getDate();
@@ -130,7 +131,7 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
         const daysInYear = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 366 : 365;
         let totalDays = view === 'year' ? daysInYear : new Date(year, month + 1, 0).getDate();
         
-        const sourceSchedules = Array.from(schedules.values());
+        const sourceSchedules: WorkScheduleType[] = Array.from(schedules.values());
         
         let workDays = 0;
         const typeCounts = Object.keys(WORK_TYPES).reduce((acc, key) => ({ ...acc, [key]: 0 }), {} as Record<string, number>);
