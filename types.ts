@@ -159,6 +159,35 @@ export interface ProductionSchedule {
     orderIndex?: number;
 }
 
+export interface Order {
+    id: string;
+    orderDate: string;
+    category?: string; // 분류
+    orderNumber?: string;
+    client: string;
+    productName: string;
+    partName?: string;
+    orderQuantity: number;
+    specification?: string;
+    postProcess?: string;
+    productionQuantity?: number;
+    remainingQuantity?: number;
+    progress?: string;
+    sampleStatus?: string;
+    shippingDate?: string;
+    manager?: string;
+    shippingType?: string;
+    jigUsed?: string;
+    registrationStatus?: string;
+    lineType?: string;
+    unitPrice?: number;
+    orderAmount?: number;
+    remarks?: string;
+    createdAt: string;
+    updatedAt: string;
+    orderIndex?: number;
+}
+
 export type ViewMode = 'ledger' | 'form' | 'detail' | 'kanban' | 'app' | 'excel';
 
 export interface Requester {

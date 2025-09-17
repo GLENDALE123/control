@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { JigRequest, Status, Comment, MasterData, Requester, Destination, Approver, Notification, JigMasterItem, UserProfile, UserRole, QualityInspection, HistoryEntry, SampleRequest, SampleStatus, ActiveCenter, PackagingReport, ProductionRequest, ProductionRequestStatus, ProductionRequestType, ProductionSchedule } from './types';
+// FIX: Add Order to the import list from types.
+import { JigRequest, Status, Comment, MasterData, Requester, Destination, Approver, Notification, JigMasterItem, UserProfile, UserRole, QualityInspection, HistoryEntry, SampleRequest, SampleStatus, ActiveCenter, PackagingReport, ProductionRequest, ProductionRequestStatus, ProductionRequestType, ProductionSchedule, Order } from './types';
 import ManagementLedger from './components/ManagementLedger';
 import RequestDetail from './components/RequestDetail';
 import RequestForm from './components/RequestForm';
@@ -106,6 +107,8 @@ const App: React.FC = () => {
   const [sampleRequests, setSampleRequests] = useState<SampleRequest[]>([]);
   const [productionRequests, setProductionRequests] = useState<ProductionRequest[]>([]);
   const [productionSchedules, setProductionSchedules] = useState<ProductionSchedule[]>([]);
+  // FIX: Add state for orders to be passed to WorkPerformanceCenter.
+  const [orders, setOrders] = useState<Order[]>([]);
   const [jigs, setJigs] = useState<JigMasterItem[]>([]);
   const [masterData, setMasterData] = useState<MasterData>({ requesters: [], destinations: [], approvers: [], requestTypes: [] });
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>('dashboard');
@@ -319,11 +322,14 @@ const App: React.FC = () => {
         setPackagingReports([]);
         setProductionRequests([]);
         setProductionSchedules([]);
+        // FIX: Reset orders state on logout.
+        setOrders([]);
         return;
     }
     setIsLoading(true);
     let loadedCount = 0;
-    const totalToLoad = 9; // requests, masterData, jigs, notifications, sampleRequests, quality, packaging, productionRequests, productionSchedules
+    // FIX: Increment totalToLoad to account for orders.
+    const totalToLoad = 10; // requests, masterData, jigs, notifications, sampleRequests, quality, packaging, productionRequests, productionSchedules, orders
     const checkAllLoaded = () => {
         loadedCount++;
         if (loadedCount >= totalToLoad) {
@@ -384,6 +390,22 @@ const App: React.FC = () => {
       }, (error) => {
         console.error("Error fetching production schedules:", error);
         addToast({ message: '생산일정 데이터를 불러오는 데 실패했습니다.', type: 'error' });
+        checkAllLoaded();
+      });
+
+    // FIX: Fetch orders and sort on the client-side to avoid Firestore composite index requirements.
+    const unsubscribeOrders = db.collection('orders').limit(500)
+      .onSnapshot((querySnapshot) => {
+        const data = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Order));
+        // Sort by orderNumber in ascending order.
+        const sortedData = data.sort((a, b) => {
+            return (a.orderNumber || '').localeCompare(b.orderNumber || '');
+        });
+        setOrders(sortedData);
+        checkAllLoaded();
+      }, (error) => {
+        console.error("Error fetching orders:", error);
+        addToast({ message: '수주 데이터를 불러오는 데 실패했습니다.', type: 'error' });
         checkAllLoaded();
       });
 
@@ -493,6 +515,8 @@ const App: React.FC = () => {
         unsubscribePackaging();
         unsubscribeProductionRequests();
         unsubscribeProductionSchedules();
+        // FIX: Unsubscribe from orders listener on cleanup.
+        unsubscribeOrders();
     };
 }, [user, addToast]);
 
@@ -1701,6 +1725,75 @@ const App: React.FC = () => {
         }
     }, [addToast, currentUserProfile]);
 
+    // FIX: Add handler functions for saving and deleting orders.
+    const handleSaveOrders = useCallback(async (newOrdersData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>[]) => {
+        if (!currentUserProfile || currentUserProfile.role === 'Member') {
+            addToast({ message: '수주를 저장할 권한이 없습니다.', type: 'error' });
+            return;
+        }
+        addToast({ message: '수주 정보를 업데이트하는 중...', type: 'info' });
+    
+        const uniqueDates = [...new Set(newOrdersData.map(s => s.orderDate))];
+        if (uniqueDates.length === 0) {
+            addToast({ message: '저장할 데이터가 없습니다.', type: 'info' });
+            return;
+        }
+    
+        try {
+            // Step 1: Find all documents to delete
+            const ordersToDeleteRefs: firebase.firestore.DocumentReference[] = [];
+            const DATE_CHUNK_SIZE = 10; // Firestore 'in' query limit
+    
+            for (let i = 0; i < uniqueDates.length; i += DATE_CHUNK_SIZE) {
+                const dateChunk = uniqueDates.slice(i, i + DATE_CHUNK_SIZE);
+                if (dateChunk.length > 0) {
+                    const query = db.collection('orders').where('orderDate', 'in', dateChunk);
+                    const snapshot = await query.get();
+                    snapshot.docs.forEach(doc => {
+                        ordersToDeleteRefs.push(doc.ref);
+                    });
+                }
+            }
+            
+            const BATCH_SIZE = 499;
+    
+            // Step 2: Delete old documents in batches
+            for (let i = 0; i < ordersToDeleteRefs.length; i += BATCH_SIZE) {
+                const batch = db.batch();
+                const chunk = ordersToDeleteRefs.slice(i, i + BATCH_SIZE);
+                chunk.forEach(ref => batch.delete(ref));
+                await batch.commit();
+            }
+            if(ordersToDeleteRefs.length > 0) {
+                 addToast({ message: `기존 데이터 ${ordersToDeleteRefs.length}건 삭제 완료.`, type: 'info' });
+            }
+    
+            // Step 3: Add new documents in batches
+            for (let i = 0; i < newOrdersData.length; i += BATCH_SIZE) {
+                const batch = db.batch();
+                const chunk = newOrdersData.slice(i, i + BATCH_SIZE);
+                chunk.forEach((orderItem) => {
+                    const newDocRef = db.collection('orders').doc();
+                    const now = new Date().toISOString();
+                    const newOrder: Omit<Order, 'id'> = {
+                        ...orderItem,
+                        createdAt: now,
+                        updatedAt: now,
+                    };
+                    batch.set(newDocRef, newOrder);
+                });
+                await batch.commit();
+                 addToast({ message: `데이터 저장 중... (${Math.min(i + BATCH_SIZE, newOrdersData.length)}/${newOrdersData.length})`, type: 'info' });
+            }
+    
+            addToast({ message: '수주 정보가 성공적으로 업데이트되었습니다.', type: 'success' });
+        } catch (error) {
+            console.error("Error saving orders:", error);
+            addToast({ message: '수주 정보 업데이트에 실패했습니다.', type: 'error' });
+            throw error;
+        }
+    }, [addToast, currentUserProfile]);
+
   const renderJigContent = () => {
     switch (activeMenu) {
       case 'dashboard':
@@ -1834,7 +1927,8 @@ const App: React.FC = () => {
       case 'notification':
         return <main className="flex-1 overflow-auto p-2 sm:p-4"><NotificationCenter notifications={notifications} onNotificationClick={handleNotificationClick} addToast={addToast} currentUserProfile={currentUserProfile} /></main>;
       case 'work':
-        return <main className="flex-1 overflow-auto p-2 sm:p-4"><WorkPerformanceCenter addToast={addToast} currentUserProfile={currentUserProfile} productionRequests={productionRequests} onOpenNewProductionRequest={handleOpenNewProductionRequest} onSelectProductionRequest={handleSelectProductionRequest} productionSchedules={productionSchedules} onSaveProductionSchedules={handleSaveProductionSchedules} onDeleteProductionSchedule={handleDeleteProductionSchedule} onDeleteProductionSchedulesByDate={handleDeleteProductionSchedulesByDate} /></main>;
+        // FIX: Pass orders state and handlers to WorkPerformanceCenter.
+        return <main className="flex-1 overflow-auto p-2 sm:p-4"><WorkPerformanceCenter addToast={addToast} currentUserProfile={currentUserProfile} productionRequests={productionRequests} onOpenNewProductionRequest={handleOpenNewProductionRequest} onSelectProductionRequest={handleSelectProductionRequest} productionSchedules={productionSchedules} onSaveProductionSchedules={handleSaveProductionSchedules} onDeleteProductionSchedule={handleDeleteProductionSchedule} onDeleteProductionSchedulesByDate={handleDeleteProductionSchedulesByDate} orders={orders} onSaveOrders={handleSaveOrders} /></main>;
       case 'sample':
         return <main className="flex-1 overflow-auto p-2 sm:p-4"><SampleCenter addToast={addToast} currentUserProfile={currentUserProfile} sampleRequests={sampleRequests} onOpenNewRequest={handleShowNewSampleRequestForm} onSelectRequest={handleSelectSampleRequest} /></main>;
       case 'settings':
