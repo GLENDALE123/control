@@ -5,9 +5,10 @@ interface FullScreenModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  maxWidth?: string;
 }
 
-const FullScreenModal: React.FC<FullScreenModalProps> = ({ isOpen, onClose, title, children }) => {
+const FullScreenModal: React.FC<FullScreenModalProps> = ({ isOpen, onClose, title, children, maxWidth = 'max-w-5xl' }) => {
   if (!isOpen) return null;
 
   return (
@@ -16,7 +17,7 @@ const FullScreenModal: React.FC<FullScreenModalProps> = ({ isOpen, onClose, titl
       onClick={onClose}
     >
       <div 
-        className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col animate-modal-in"
+        className={`bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full ${maxWidth} max-h-[90vh] flex flex-col animate-modal-in`}
         onClick={e => e.stopPropagation()}
       >
         <header className="flex items-center justify-between p-4 border-b dark:border-slate-700 flex-shrink-0">
