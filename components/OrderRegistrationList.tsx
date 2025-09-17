@@ -174,6 +174,42 @@ const UpdateOrderModal: FC<{
     );
 };
 
+const MemoizedOrderRow: FC<{ order: Order }> = React.memo(({ order }) => {
+    const dateParts = typeof order.orderDate === 'string' ? order.orderDate.split('-') : ['', '', ''];
+    const year = dateParts[0] || '';
+    const month = dateParts[1] || '';
+    const day = dateParts[2] || '';
+    
+    return (
+        <tr className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+            <td className="px-2 py-2 whitespace-nowrap">{year}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{month}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{day}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{order.category}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{order.orderNumber}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{order.client}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{order.productName}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{order.partName}</td>
+            <td className="px-2 py-2 whitespace-nowrap text-right">{order.orderQuantity?.toLocaleString()}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{order.specification}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{order.postProcess}</td>
+            <td className="px-2 py-2 whitespace-nowrap text-right">{order.productionQuantity?.toLocaleString()}</td>
+            <td className="px-2 py-2 whitespace-nowrap text-right">{order.remainingQuantity?.toLocaleString()}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{order.progress}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{order.sampleStatus}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{order.shippingDate}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{order.manager}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{order.shippingType}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{order.jigUsed}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{order.registrationStatus}</td>
+            <td className="px-2 py-2 whitespace-nowrap">{order.lineType}</td>
+            <td className="px-2 py-2 whitespace-nowrap text-right">{order.unitPrice?.toLocaleString()}</td>
+            <td className="px-2 py-2 whitespace-nowrap text-right">{order.orderAmount?.toLocaleString()}</td>
+            <td className="px-2 py-2 whitespace-nowrap" title={order.remarks}>{order.remarks}</td>
+        </tr>
+    );
+});
+
 
 const OrderRegistrationList: FC<OrderRegistrationListProps> = ({ orders, onSave, currentUserProfile }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -424,37 +460,9 @@ const OrderRegistrationList: FC<OrderRegistrationListProps> = ({ orders, onSave,
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredOrders.map((order) => {
-                            const [year, month, day] = order.orderDate.split('-');
-                            return (
-                                <tr key={order.id} className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                    <td className="px-2 py-2 whitespace-nowrap">{year}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{month}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{day}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{order.category}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{order.orderNumber}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{order.client}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{order.productName}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{order.partName}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap text-right">{order.orderQuantity?.toLocaleString()}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{order.specification}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{order.postProcess}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap text-right">{order.productionQuantity?.toLocaleString()}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap text-right">{order.remainingQuantity?.toLocaleString()}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{order.progress}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{order.sampleStatus}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{order.shippingDate}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{order.manager}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{order.shippingType}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{order.jigUsed}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{order.registrationStatus}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap">{order.lineType}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap text-right">{order.unitPrice?.toLocaleString()}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap text-right">{order.orderAmount?.toLocaleString()}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap" title={order.remarks}>{order.remarks}</td>
-                                </tr>
-                            );
-                        })}
+                        {filteredOrders.map((order) => (
+                            <MemoizedOrderRow key={order.id} order={order} />
+                        ))}
                     </tbody>
                 </table>
                 {filteredOrders.length === 0 && <p className="text-center p-8 text-slate-500">표시할 수주 데이터가 없습니다.</p>}

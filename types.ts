@@ -1,4 +1,5 @@
-// FIX: Removed self-import of enums which was causing declaration conflicts.
+// FIX: Removed circular dependency by deleting self-import of enums.
+// The enums are defined in this file and should be the single source of truth.
 
 // FIX: Removed unused import of POST_PROCESSING_DEPARTMENTS.
 export enum Status {
@@ -132,6 +133,7 @@ export interface ProductionRequest {
   history: HistoryEntry[];
   comments?: Comment[];
   imageUrls?: string[];
+  sourceReportIds?: string[];
 }
 
 export interface ProductionSchedule {
@@ -154,6 +156,35 @@ export interface ProductionSchedule {
     jigUsed?: string; // 사용지그
     newOrRe?: string; // 신/재
     shortageQuantity: number; // 부족수량
+    createdAt: string;
+    updatedAt: string;
+    orderIndex?: number;
+}
+
+export interface Order {
+    id: string;
+    orderDate: string;
+    category?: string; // 분류
+    orderNumber?: string;
+    client: string;
+    productName: string;
+    partName?: string;
+    orderQuantity: number;
+    specification?: string;
+    postProcess?: string;
+    productionQuantity?: number;
+    remainingQuantity?: number;
+    progress?: string;
+    sampleStatus?: string;
+    shippingDate?: string;
+    manager?: string;
+    shippingType?: string;
+    jigUsed?: string;
+    registrationStatus?: string;
+    lineType?: string;
+    unitPrice?: number;
+    orderAmount?: number;
+    remarks?: string;
     createdAt: string;
     updatedAt: string;
     orderIndex?: number;
@@ -222,17 +253,6 @@ export interface UserProfile {
   email: string;
   displayName: string;
   role: UserRole;
-}
-
-export interface UserPreferences {
-  theme?: 'light' | 'dark';
-  notificationPrefs?: {
-    announcements?: boolean;
-    jig?: boolean;
-    work?: boolean;
-    quality?: boolean;
-    sample?: boolean;
-  };
 }
 
 export type InspectionType = 'incoming' | 'inProcess' | 'outgoing';
@@ -404,6 +424,11 @@ export interface PackagedBox {
     reason?: string;
 }
 
+export interface ProcessCoat {
+    conditions: string;
+    remarks: string;
+}
+
 export interface PackagingReport {
     id: string;
     createdAt: string;
@@ -432,6 +457,11 @@ export interface PackagingReport {
     boxCount?: number;
     remainder?: number;
     packagedBoxes: PackagedBox[];
+    processConditions?: {
+        undercoat?: ProcessCoat;
+        midcoat?: ProcessCoat;
+        topcoat?: ProcessCoat;
+    };
     memo?: string;
     imageUrls?: string[];
 }
@@ -450,8 +480,9 @@ export interface ShortageRequest {
     supplier: string;
     productName: string;
     partName: string;
-    orderQuantity?: number;
+// FIX: Add specification to ShortageRequest type to match usage in WorkPerformanceCenter.tsx
     specification: string;
+    orderQuantity?: number;
     inputQuantity?: number;
     goodQuantity?: number;
     defectQuantity?: number;

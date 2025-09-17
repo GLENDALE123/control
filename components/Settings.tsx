@@ -3,7 +3,6 @@ import ThemeToggle from './ThemeToggle';
 import AppIcon from './AppIcon';
 import { UserProfile, UserRole } from '../types';
 import { db } from '../firebaseConfig';
-import firebase from 'firebase/compat/app';
 
 type Theme = 'light' | 'dark';
 
@@ -109,24 +108,6 @@ const UserManagement: React.FC<{ currentUserProfile: UserProfile | null }> = ({ 
 
 
 const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile }) => {
-  const [notifPrefs, setNotifPrefs] = useState<{ jig: boolean; work: boolean; quality: boolean; sample: boolean }>({ jig: true, work: true, quality: true, sample: true });
-
-  useEffect(() => {
-    const user = firebase.auth().currentUser;
-    if (!user) return;
-    const prefDocRef = db.collection('users').doc(user.uid).collection('preferences').doc('singleton');
-    const unsubscribe = prefDocRef.onSnapshot((snap) => {
-      const data = (snap.data() as any) || {};
-      setNotifPrefs({
-        jig: data?.notificationPrefs?.jig !== false,
-        work: data?.notificationPrefs?.work !== false,
-        quality: data?.notificationPrefs?.quality !== false,
-        sample: data?.notificationPrefs?.sample !== false,
-      });
-    });
-    return () => unsubscribe();
-  }, []);
-
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg h-full overflow-auto">
       <div className="p-6">
@@ -137,51 +118,10 @@ const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile
             title="앱 전체 테마"
             description={theme === 'dark' ? '다크 모드 활성화됨. 눈의 피로를 줄여줍니다.' : '라이트 모드 활성화됨.'}
           >
-            <div className="flex items-center gap-3">
-              <ThemeToggle theme={theme} setTheme={(next) => {
-                setTheme(next);
-              }} />
-            </div>
+            <ThemeToggle theme={theme} setTheme={setTheme} />
           </SettingRow>
 
           {currentUserProfile?.role === 'Admin' && <UserManagement currentUserProfile={currentUserProfile} />}
-
-          <div className="p-4 border dark:border-slate-700 rounded-lg">
-            <h3 className="text-lg font-semibold text-gray-700 dark:text-slate-200 mb-2">알림 설정</h3>
-            <p className="text-sm text-gray-500 dark:text-slate-400 mb-3">공지는 모든 사용자에게 공통 발송됩니다. 아래에서 나머지 카테고리를 개별 설정할 수 있어요.</p>
-            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4">
-              {[
-                { key: 'jig', label: '지그' },
-                { key: 'work', label: '생산' },
-                { key: 'quality', label: '품질' },
-                { key: 'sample', label: '샘플' },
-              ].map(({ key, label }) => {
-                const isOn = (notifPrefs as any)[key] === true;
-                return (
-                  <div key={key} className="inline-flex items-center gap-3">
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={isOn}
-                      onClick={async () => {
-                        const user = firebase.auth().currentUser;
-                        if (!user) return;
-                        const next = !isOn;
-                        setNotifPrefs((prev) => ({ ...(prev as any), [key]: next } as any));
-                        const update: any = {};
-                        update[`notificationPrefs.${key}`] = next;
-                        await db.collection('users').doc(user.uid).collection('preferences').doc('singleton').set(update, { merge: true });
-                      }}
-                      className={`w-12 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 ${isOn ? 'bg-green-500 dark:bg-green-600 focus:ring-green-500' : 'bg-slate-300 dark:bg-slate-700 focus:ring-slate-400 dark:focus:ring-slate-500'}`}
-                    >
-                      <span className={`block w-5 h-5 bg-white rounded-full shadow transform transition-transform ${isOn ? 'translate-x-0.5' : 'translate-x-6'}`} />
-                    </button>
-                    <span className="text-sm text-gray-700 dark:text-slate-200">{label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
 
           <div className="p-4 border dark:border-slate-700 rounded-lg">
              <h3 className="text-lg font-semibold text-gray-700 dark:text-slate-200 mb-4">앱 정보</h3>
@@ -191,10 +131,10 @@ const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile
                 </div>
                 <div>
                   <p className="text-gray-600 dark:text-slate-300">
-                    <strong>Total Management System</strong> v1.3.0
+                    <strong>Total Management System</strong> v1.4.0
                   </p>
                   <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                    지그 및 품질 관리 업무의 전 과정을 체계적으로 관리하고 추적하는 통합 웹 애플리케이션입니다. 센터별 설정 분리 및 통합 앱 가이드 기능이 추가되었습니다.
+                    지그 및 품질 관리 업무의 전 과정을 체계적으로 관리하고 추적하는 통합 웹 애플리케이션입니다. 성능 최적화 및 안정성 개선이 적용되었습니다.
                   </p>
                 </div>
              </div>

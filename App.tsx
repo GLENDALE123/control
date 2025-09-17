@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { JigRequest, Status, Comment, MasterData, Requester, Destination, Approver, Notification, JigMasterItem, UserProfile, UserRole, QualityInspection, HistoryEntry, SampleRequest, SampleStatus, ActiveCenter, PackagingReport, ProductionRequest, ProductionRequestStatus, ProductionRequestType, ProductionSchedule } from './types';
+// FIX: Add Order to the import list from types.
+import { JigRequest, Status, Comment, MasterData, Requester, Destination, Approver, Notification, JigMasterItem, UserProfile, UserRole, QualityInspection, HistoryEntry, SampleRequest, SampleStatus, ActiveCenter, PackagingReport, ProductionRequest, ProductionRequestStatus, ProductionRequestType, ProductionSchedule, Order } from './types';
 import ManagementLedger from './components/ManagementLedger';
 import RequestDetail from './components/RequestDetail';
 import RequestForm from './components/RequestForm';
@@ -99,13 +100,15 @@ const ToastContainer: React.FC<{ toasts: Toast[]; onRemove: (id: number) => void
 };
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<any | null>(null);
+  const [user, setUser] = useState<firebase.User | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [requests, setRequests] = useState<JigRequest[]>([]);
   const [sampleRequests, setSampleRequests] = useState<SampleRequest[]>([]);
   const [productionRequests, setProductionRequests] = useState<ProductionRequest[]>([]);
   const [productionSchedules, setProductionSchedules] = useState<ProductionSchedule[]>([]);
+  // FIX: Add state for orders to be passed to WorkPerformanceCenter.
+  const [orders, setOrders] = useState<Order[]>([]);
   const [jigs, setJigs] = useState<JigMasterItem[]>([]);
   const [masterData, setMasterData] = useState<MasterData>({ requesters: [], destinations: [], approvers: [], requestTypes: [] });
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>('dashboard');
@@ -319,11 +322,14 @@ const App: React.FC = () => {
         setPackagingReports([]);
         setProductionRequests([]);
         setProductionSchedules([]);
+        // FIX: Reset orders state on logout.
+        setOrders([]);
         return;
     }
     setIsLoading(true);
     let loadedCount = 0;
-    const totalToLoad = 9; // requests, masterData, jigs, notifications, sampleRequests, quality, packaging, productionRequests, productionSchedules
+    // FIX: Increment totalToLoad to account for orders.
+    const totalToLoad = 10; // requests, masterData, jigs, notifications, sampleRequests, quality, packaging, productionRequests, productionSchedules, orders
     const checkAllLoaded = () => {
         loadedCount++;
         if (loadedCount >= totalToLoad) {
@@ -331,7 +337,7 @@ const App: React.FC = () => {
         }
     }
 
-    const unsubscribeRequests = db.collection('jig-requests').orderBy('requestDate', 'desc').limit(500)
+    const unsubscribeRequests = db.collection('jig-requests').orderBy('requestDate', 'desc').limit(300)
       .onSnapshot((querySnapshot) => {
         const requestsData = querySnapshot.docs.map(doc => {
             const data = doc.data();
@@ -351,7 +357,7 @@ const App: React.FC = () => {
         checkAllLoaded();
     });
 
-    const unsubscribeSampleRequests = db.collection('sample-requests').orderBy('createdAt', 'desc').limit(500)
+    const unsubscribeSampleRequests = db.collection('sample-requests').orderBy('createdAt', 'desc').limit(300)
       .onSnapshot((querySnapshot) => {
           const sampleData = querySnapshot.docs.map(doc => {
               const data = doc.data();
@@ -365,7 +371,7 @@ const App: React.FC = () => {
           checkAllLoaded();
       });
 
-    const unsubscribeProductionRequests = db.collection('production-requests').orderBy('createdAt', 'desc').limit(500)
+    const unsubscribeProductionRequests = db.collection('production-requests').orderBy('createdAt', 'desc').limit(300)
       .onSnapshot((querySnapshot) => {
         const data = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ProductionRequest));
         setProductionRequests(data);
@@ -376,7 +382,7 @@ const App: React.FC = () => {
         checkAllLoaded();
       });
     
-    const unsubscribeProductionSchedules = db.collection('production-schedules').orderBy('planDate', 'desc').limit(500)
+    const unsubscribeProductionSchedules = db.collection('production-schedules').orderBy('planDate', 'desc').limit(300)
       .onSnapshot((querySnapshot) => {
         const data = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ProductionSchedule));
         setProductionSchedules(data);
@@ -384,6 +390,22 @@ const App: React.FC = () => {
       }, (error) => {
         console.error("Error fetching production schedules:", error);
         addToast({ message: '생산일정 데이터를 불러오는 데 실패했습니다.', type: 'error' });
+        checkAllLoaded();
+      });
+
+    // FIX: Fetch orders and sort on the client-side to avoid Firestore composite index requirements.
+    const unsubscribeOrders = db.collection('orders').limit(500)
+      .onSnapshot((querySnapshot) => {
+        const data = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Order));
+        // Sort by orderNumber in ascending order.
+        const sortedData = data.sort((a, b) => {
+            return (a.orderNumber || '').localeCompare(b.orderNumber || '');
+        });
+        setOrders(sortedData);
+        checkAllLoaded();
+      }, (error) => {
+        console.error("Error fetching orders:", error);
+        addToast({ message: '수주 데이터를 불러오는 데 실패했습니다.', type: 'error' });
         checkAllLoaded();
       });
 
@@ -444,7 +466,7 @@ const App: React.FC = () => {
         checkAllLoaded();
       });
 
-    const unsubscribeQuality = db.collection('quality-inspections').orderBy('createdAt', 'desc').limit(500)
+    const unsubscribeQuality = db.collection('quality-inspections').orderBy('createdAt', 'desc').limit(300)
       .onSnapshot(querySnapshot => {
         const inspectionsData = querySnapshot.docs.map(doc => ({
           ...doc.data(),
@@ -458,7 +480,7 @@ const App: React.FC = () => {
         checkAllLoaded();
       });
 
-    const unsubscribePackaging = db.collection('packaging-reports').orderBy('workDate', 'desc').limit(500)
+    const unsubscribePackaging = db.collection('packaging-reports').orderBy('workDate', 'desc').limit(300)
       .onSnapshot(querySnapshot => {
         const reportsData = querySnapshot.docs.map(doc => ({
           ...doc.data(),
@@ -482,47 +504,10 @@ const App: React.FC = () => {
         addToast({ message: '설정 정보를 불러오는 데 실패했습니다.', type: 'error' });
     });
 
-    // User preferences override
-    let unsubscribeUserPrefs: (() => void) | null = null;
-    if (user) {
-      const prefDocRef = db.collection('users').doc(user.uid).collection('preferences').doc('singleton');
-      unsubscribeUserPrefs = prefDocRef.onSnapshot(async (snap) => {
-        try {
-          if (!snap.exists) {
-            // Create defaults when missing
-            await prefDocRef.set({
-              notificationPrefs: { jig: true, work: true, quality: true, sample: true }
-            }, { merge: true });
-            return;
-          }
-
-          const prefs = (snap.data() as any) || {};
-          // Fill any missing keys with true without overriding existing false
-          const needed: Record<string, boolean> = {};
-          const keys = ['jig','work','quality','sample'];
-          keys.forEach((k) => {
-            if (prefs?.notificationPrefs?.[k] === undefined) {
-              needed[`notificationPrefs.${k}`] = true;
-            }
-          });
-          if (Object.keys(needed).length > 0) {
-            await prefDocRef.set(needed, { merge: true });
-          }
-
-          if (prefs?.theme) setTheme(prefs.theme);
-        } catch (e) {
-          console.error('Error initializing user preferences:', e);
-        }
-      }, (error) => {
-        console.error('Error fetching user preferences:', error);
-      });
-    }
-
     return () => {
         unsubscribeRequests();
         unsubscribeMasterData();
         unsubscribeSettings();
-        if (unsubscribeUserPrefs) unsubscribeUserPrefs();
         unsubscribeJigs();
         unsubscribeNotifications();
         unsubscribeSampleRequests();
@@ -530,18 +515,17 @@ const App: React.FC = () => {
         unsubscribePackaging();
         unsubscribeProductionRequests();
         unsubscribeProductionSchedules();
+        // FIX: Unsubscribe from orders listener on cleanup.
+        unsubscribeOrders();
     };
 }, [user, addToast]);
 
   const handleSetTheme = useCallback((newTheme: Theme) => {
     setTheme(newTheme);
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-    db.collection('users').doc(uid).collection('preferences').doc('singleton')
-      .update({ theme: newTheme })
+    db.collection('settings').doc('singleton').set({ globalTheme: newTheme }, { merge: true })
       .catch(error => {
-          console.error("Error saving user theme preference:", error);
-          addToast({ message: '내 테마 저장에 실패했습니다.', type: 'error' });
+          console.error("Error saving theme setting:", error);
+          addToast({ message: '테마 설정 저장에 실패했습니다.', type: 'error' });
       });
   }, [addToast]);
 
@@ -663,18 +647,12 @@ const App: React.FC = () => {
                 addToast({ message: `이미지 업로드 중... (0/${imageFiles.length})`, type: 'info' });
                 const imageUrls = await Promise.all(
                     imageFiles.map(async (file, index) => {
-                        try {
-                            const uniqueFileName = `${Date.now()}-${file.name}`;
-                            const imageRef = storage.ref(`jig-request-images/${newId}/${uniqueFileName}`);
-                            const snapshot = await imageRef.put(file, { contentType: file.type || 'image/*' });
-                            const downloadURL = await snapshot.ref.getDownloadURL();
-                            addToast({ message: `이미지 업로드 중... (${index + 1}/${imageFiles.length})`, type: 'info' });
-                            return downloadURL;
-                        } catch (e) {
-                            console.error('Image upload failed (jig-request):', file.name, e);
-                            addToast({ message: `이미지 업로드 실패: ${file.name}`, type: 'error' });
-                            throw e;
-                        }
+                        const uniqueFileName = `${Date.now()}-${file.name}`;
+                        const imageRef = storage.ref(`jig-request-images/${newId}/${uniqueFileName}`);
+                        const snapshot = await imageRef.put(file);
+                        const downloadURL = await snapshot.ref.getDownloadURL();
+                        addToast({ message: `이미지 업로드 중... (${index + 1}/${imageFiles.length})`, type: 'info' });
+                        return downloadURL;
                     })
                 );
                 await db.collection('jig-requests').doc(newId).update({ imageUrls });
@@ -1039,7 +1017,7 @@ const App: React.FC = () => {
         for (const file of imageFiles) {
             const uniqueFileName = `${Date.now()}-${file.name}`;
             const imageRef = storage.ref(`jig-master-images/${newId}/${uniqueFileName}`);
-            const snapshot = await imageRef.put(file, { contentType: file.type || 'image/*' });
+            const snapshot = await imageRef.put(file);
             const downloadURL = await snapshot.ref.getDownloadURL();
             imageUrls.push(downloadURL);
         }
@@ -1224,7 +1202,7 @@ const App: React.FC = () => {
                 const imageUrls = await Promise.all(
                     images.map(file => {
                         const ref = storage.ref(`sample-request-images/${newId}/${Date.now()}-${file.name}`);
-                        return ref.put(file, { contentType: file.type || 'image/*' }).then(snapshot => snapshot.ref.getDownloadURL());
+                        return ref.put(file).then(snapshot => snapshot.ref.getDownloadURL());
                     })
                 );
                 await db.collection('sample-requests').doc(newId).update({ imageUrls });
@@ -1345,7 +1323,7 @@ const App: React.FC = () => {
     const handleUploadSampleImage = useCallback(async (id: string, file: File) => {
         try {
             const ref = storage.ref(`sample-request-images/${id}/${Date.now()}-${file.name}`);
-            const snapshot = await ref.put(file, { contentType: file.type || 'image/*' });
+            const snapshot = await ref.put(file);
             const downloadURL = await snapshot.ref.getDownloadURL();
             await db.collection('sample-requests').doc(id).update({
                 imageUrls: firebase.firestore.FieldValue.arrayUnion(downloadURL)
@@ -1489,7 +1467,7 @@ const App: React.FC = () => {
                         imageFiles.map(async (file) => {
                             const uniqueFileName = `${Date.now()}-${file.name}`;
                             const imageRef = storage.ref(`production-request-images/${newId}/${uniqueFileName}`);
-                            const snapshot = await imageRef.put(file, { contentType: file.type || 'image/*' });
+                            const snapshot = await imageRef.put(file);
                             return await snapshot.ref.getDownloadURL();
                         })
                     );
@@ -1663,7 +1641,7 @@ const App: React.FC = () => {
         }
     
         try {
-            const schedulesToDeleteRefs: any[] = [];
+            const schedulesToDeleteRefs: firebase.firestore.DocumentReference[] = [];
             // Firestore 'in' queries are limited to 10 items in some SDK versions/configurations.
             // Using a safer chunk size of 10 instead of 30 to prevent query failures.
             const CHUNK_SIZE = 10;
@@ -1747,6 +1725,75 @@ const App: React.FC = () => {
         }
     }, [addToast, currentUserProfile]);
 
+    // FIX: Add handler functions for saving and deleting orders.
+    const handleSaveOrders = useCallback(async (newOrdersData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>[]) => {
+        if (!currentUserProfile || currentUserProfile.role === 'Member') {
+            addToast({ message: '수주를 저장할 권한이 없습니다.', type: 'error' });
+            return;
+        }
+        addToast({ message: '수주 정보를 업데이트하는 중...', type: 'info' });
+    
+        const uniqueDates = [...new Set(newOrdersData.map(s => s.orderDate))];
+        if (uniqueDates.length === 0) {
+            addToast({ message: '저장할 데이터가 없습니다.', type: 'info' });
+            return;
+        }
+    
+        try {
+            // Step 1: Find all documents to delete
+            const ordersToDeleteRefs: firebase.firestore.DocumentReference[] = [];
+            const DATE_CHUNK_SIZE = 10; // Firestore 'in' query limit
+    
+            for (let i = 0; i < uniqueDates.length; i += DATE_CHUNK_SIZE) {
+                const dateChunk = uniqueDates.slice(i, i + DATE_CHUNK_SIZE);
+                if (dateChunk.length > 0) {
+                    const query = db.collection('orders').where('orderDate', 'in', dateChunk);
+                    const snapshot = await query.get();
+                    snapshot.docs.forEach(doc => {
+                        ordersToDeleteRefs.push(doc.ref);
+                    });
+                }
+            }
+            
+            const BATCH_SIZE = 499;
+    
+            // Step 2: Delete old documents in batches
+            for (let i = 0; i < ordersToDeleteRefs.length; i += BATCH_SIZE) {
+                const batch = db.batch();
+                const chunk = ordersToDeleteRefs.slice(i, i + BATCH_SIZE);
+                chunk.forEach(ref => batch.delete(ref));
+                await batch.commit();
+            }
+            if(ordersToDeleteRefs.length > 0) {
+                 addToast({ message: `기존 데이터 ${ordersToDeleteRefs.length}건 삭제 완료.`, type: 'info' });
+            }
+    
+            // Step 3: Add new documents in batches
+            for (let i = 0; i < newOrdersData.length; i += BATCH_SIZE) {
+                const batch = db.batch();
+                const chunk = newOrdersData.slice(i, i + BATCH_SIZE);
+                chunk.forEach((orderItem) => {
+                    const newDocRef = db.collection('orders').doc();
+                    const now = new Date().toISOString();
+                    const newOrder: Omit<Order, 'id'> = {
+                        ...orderItem,
+                        createdAt: now,
+                        updatedAt: now,
+                    };
+                    batch.set(newDocRef, newOrder);
+                });
+                await batch.commit();
+                 addToast({ message: `데이터 저장 중... (${Math.min(i + BATCH_SIZE, newOrdersData.length)}/${newOrdersData.length})`, type: 'info' });
+            }
+    
+            addToast({ message: '수주 정보가 성공적으로 업데이트되었습니다.', type: 'success' });
+        } catch (error) {
+            console.error("Error saving orders:", error);
+            addToast({ message: '수주 정보 업데이트에 실패했습니다.', type: 'error' });
+            throw error;
+        }
+    }, [addToast, currentUserProfile]);
+
   const renderJigContent = () => {
     switch (activeMenu) {
       case 'dashboard':
@@ -1785,6 +1832,13 @@ const App: React.FC = () => {
         case 'jigDetail': return '지그 상세 정보';
         default: return '';
     }
+  };
+
+  const getModalMaxWidth = () => {
+    if (modal.view === 'productionRequestDetail' && (modal.data as ProductionRequest)?.requestType === ProductionRequestType.LogisticsTransfer) {
+        return 'max-w-[96rem]';
+    }
+    return 'max-w-5xl';
   };
 
   const autocompleteJigData = useMemo(() => ({
@@ -1880,7 +1934,8 @@ const App: React.FC = () => {
       case 'notification':
         return <main className="flex-1 overflow-auto p-2 sm:p-4"><NotificationCenter notifications={notifications} onNotificationClick={handleNotificationClick} addToast={addToast} currentUserProfile={currentUserProfile} /></main>;
       case 'work':
-        return <main className="flex-1 overflow-auto p-2 sm:p-4"><WorkPerformanceCenter addToast={addToast} currentUserProfile={currentUserProfile} productionRequests={productionRequests} onOpenNewProductionRequest={handleOpenNewProductionRequest} onSelectProductionRequest={handleSelectProductionRequest} productionSchedules={productionSchedules} onSaveProductionSchedules={handleSaveProductionSchedules} onDeleteProductionSchedule={handleDeleteProductionSchedule} onDeleteProductionSchedulesByDate={handleDeleteProductionSchedulesByDate} /></main>;
+        // FIX: Pass orders state and handlers to WorkPerformanceCenter.
+        return <main className="flex-1 overflow-auto p-2 sm:p-4"><WorkPerformanceCenter addToast={addToast} currentUserProfile={currentUserProfile} productionRequests={productionRequests} onOpenNewProductionRequest={handleOpenNewProductionRequest} onSelectProductionRequest={handleSelectProductionRequest} productionSchedules={productionSchedules} onSaveProductionSchedules={handleSaveProductionSchedules} onDeleteProductionSchedule={handleDeleteProductionSchedule} onDeleteProductionSchedulesByDate={handleDeleteProductionSchedulesByDate} orders={orders} onSaveOrders={handleSaveOrders} /></main>;
       case 'sample':
         return <main className="flex-1 overflow-auto p-2 sm:p-4"><SampleCenter addToast={addToast} currentUserProfile={currentUserProfile} sampleRequests={sampleRequests} onOpenNewRequest={handleShowNewSampleRequestForm} onSelectRequest={handleSelectSampleRequest} /></main>;
       case 'settings':
@@ -1982,6 +2037,7 @@ const App: React.FC = () => {
             isOpen={modal.view !== null}
             onClose={handleCloseModal}
             title={getModalTitle()}
+            maxWidth={getModalMaxWidth()}
         >
             {modal.view === 'requestForm' && (
                 <RequestForm onSave={handleSaveRequest} onCancel={handleCloseModal} existingRequest={modal.data} masterData={masterData} />

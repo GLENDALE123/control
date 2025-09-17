@@ -43,8 +43,8 @@ const QualityIssueForm: React.FC<{
 
     const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            const files: File[] = Array.from(e.target.files as FileList);
-            const newPreviews = files.map((file: File) => URL.createObjectURL(file));
+            const files = Array.from(e.target.files);
+            const newPreviews = files.map(file => URL.createObjectURL(file));
             setImageFiles(prev => [...prev, ...files]);
             setImagePreviews(prev => [...prev, ...newPreviews]);
         }
@@ -378,16 +378,9 @@ const QualityIssueCenter: React.FC<QualityIssueCenterProps> = ({ currentUserProf
             
             if (imageFiles.length > 0) {
                 const imageUrls = await Promise.all(
-                    imageFiles.map(async (file) => {
-                        try {
-                            const ref = storage.ref(`quality-issue-images/${newDocRef.id}/${Date.now()}-${file.name}`);
-                            const snapshot = await ref.put(file, { contentType: file.type || 'image/*' });
-                            return await snapshot.ref.getDownloadURL();
-                        } catch (e) {
-                            console.error('Image upload failed (quality-issue):', file.name, e);
-                            addToast({ message: `이미지 업로드 실패: ${file.name}`, type: 'error' });
-                            throw e;
-                        }
+                    imageFiles.map(file => {
+                        const ref = storage.ref(`quality-issue-images/${newDocRef.id}/${Date.now()}-${file.name}`);
+                        return ref.put(file).then(snapshot => snapshot.ref.getDownloadURL());
                     })
                 );
                 await newDocRef.update({ imageUrls });
