@@ -391,14 +391,31 @@ const PackagingFormSection: FC<{
     };
     
     const handleOrderNumberChange = (index: number, value: string) => {
-        const numericPart = value.replace(/^T/i, '').replace(/[^0-9-]/g, '');
+        // 백스페이스로 모든 내용을 지웠을 때 빈 문자열로 처리
+        if (value === '') {
+            const newOrderNumbers = [...formData.orderNumbers];
+            newOrderNumbers[index] = '';
+            setFormData(prev => ({...prev, orderNumbers: newOrderNumbers}));
+            return;
+        }
+        
+        // T를 제거하고 숫자와 -만 남김 (기존 -는 유지)
+        const withoutT = value.replace(/^T/i, '');
+        const numericPart = withoutT.replace(/[^0-9-]/g, '');
         
         let formatted = 'T';
         if (numericPart.length > 0) {
-            if (numericPart.length <= 5) {
+            // 이미 -가 있는 경우와 없는 경우를 구분
+            if (numericPart.includes('-')) {
+                // 이미 -가 있으면 그대로 사용
                 formatted += numericPart;
             } else {
-                formatted += `${numericPart.substring(0, 5)}-${numericPart.substring(5)}`;
+                // -가 없으면 5자리 이후에 추가
+                if (numericPart.length <= 5) {
+                    formatted += numericPart;
+                } else {
+                    formatted += `${numericPart.substring(0, 5)}-${numericPart.substring(5)}`;
+                }
             }
         }
         
@@ -704,7 +721,7 @@ const ReportList: FC<{ reports: PackagingReport[], onEdit: (report: PackagingRep
                                         onClick={() => onOpenProcessConditionsModal(report)} 
                                         className="w-full text-center hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded p-1 transition-colors"
                                     >
-                                        {report.processConditions && (Object.values(report.processConditions).some(v => v?.conditions || v?.remarks)) ? (
+                                        {report.processConditions && (Object.values(report.processConditions).some(v => (v as any)?.conditions || (v as any)?.remarks)) ? (
                                             <span className="font-bold text-green-500 text-lg">O</span>
                                         ) : (
                                             <span className="text-slate-400">-</span>
@@ -1399,7 +1416,7 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
                     requestType: ProductionRequestType.LogisticsTransfer,
                     requester: currentUserProfile.displayName,
                     orderNumber: orderNumbers.join(', '),
-                    productName: productNames.length > 1 ? `${productNames[0]} 외 ${productNames.length - 1}건` : productNames[0],
+                    productName: productNames.length > 1 ? `${productNames[0] as string} 외 ${productNames.length - 1}건` : (productNames[0] as string || ''),
                     partName: partNames.join(', '),
                     supplier: suppliers.join(', '),
                     quantity: totalQuantity,
