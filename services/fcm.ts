@@ -11,9 +11,15 @@ function isSupported(): boolean {
   return typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator;
 }
 
+// FCM 초기화 상태를 추적하여 중복 초기화 방지
+let isFCMInitialized = false;
+
 export async function initFCM(): Promise<FcmInitResult> {
   if (!isSupported()) return { token: null, permission: 'denied' };
+  if (isFCMInitialized) return { token: null, permission: Notification.permission };
+  
   try {
+    isFCMInitialized = true;
     const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
     let permission = Notification.permission;
     if (permission === 'default') permission = await Notification.requestPermission();
@@ -33,27 +39,16 @@ export async function initFCM(): Promise<FcmInitResult> {
       });
     }
 
+    // onMessage 리스너는 한 번만 등록
     messaging.onMessage(async (payload) => {
-      const title = payload.notification?.title ?? '알림';
-      const body = payload.notification?.body ?? '';
-      const icon = payload.notification?.icon;
-      const options: NotificationOptions = {
-        body,
-        icon,
-        data: payload.data || {},
-        vibrate: [150, 80, 150],
-        tag: (payload?.data as any)?.tag || 'tms-notification',
-        renotify: true,
-        requireInteraction: false,
-        actions: [{ action: 'open', title: '열기' }],
-        timestamp: Date.now()
-      } as any;
-      if (!document.hidden) registration.showNotification(title, options);
+      // 브라우저가 자동으로 알림을 표시하므로 별도로 showNotification 호출하지 않음
+      console.log('FCM 메시지 수신:', payload);
     });
 
     return { token, permission };
   } catch (e) {
     console.error('FCM init error:', e);
+    isFCMInitialized = false; // 에러 시 초기화 상태 리셋
     return { token: null, permission: Notification.permission };
   }
 }
