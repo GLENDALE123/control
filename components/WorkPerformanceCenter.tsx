@@ -1617,7 +1617,7 @@ export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ ad
                         </main>
                     </div>
                 )}
-                 {activeTab === 'reportList' && (
+                {activeTab === 'reportList' && (
                     <div className="h-full flex flex-col gap-4">
                         <div className="flex-shrink-0 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
                              <div 
