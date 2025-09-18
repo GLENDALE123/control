@@ -115,7 +115,8 @@ const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile
 
   useEffect(() => {
     const user = firebase.auth().currentUser;
-    if (!user) return;
+    if (!user || !currentUserProfile) return;
+    
     const ref = db.collection('users').doc(user.uid).collection('preferences').doc('singleton');
     const unsub = ref.onSnapshot((snap) => {
       const data = (snap.data() as any) || {};
@@ -127,7 +128,7 @@ const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile
       });
     });
     return () => unsub();
-  }, []);
+  }, [currentUserProfile]);
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg h-full overflow-auto">
