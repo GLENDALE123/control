@@ -32,6 +32,7 @@ interface QualityControlCenterProps {
     setTheme: (theme: Theme) => void;
     currentUserProfile: UserProfile | null;
     addToast: (toast: { message: string; type: 'success' | 'error' | 'info' }) => void;
+    removeToast: (id: number) => void;
     deepLinkOrderNumber: string | null;
     onDeepLinkHandled: () => void;
     onUpdateInspection: (id: string, updates: Partial<QualityInspection>, reason?: string) => Promise<void>;
@@ -2234,6 +2235,7 @@ const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
 const CircleCenter: React.FC<{
     currentUserProfile: UserProfile | null;
     addToast: (toast: { message: string; type: 'success' | 'error' | 'info' }) => void;
+    removeToast: (id: number) => void;
     onUpdateInspection: (id: string, updates: Partial<QualityInspection>, reason?: string) => Promise<void>;
     prefilledData: Partial<QualityInspection> | null;
     onPrefillHandled: () => void;
@@ -2243,7 +2245,7 @@ const CircleCenter: React.FC<{
     onInitialTabHandled?: () => void;
     // FIX: Add 'inspections' to the props interface to resolve TypeScript error.
     inspections: QualityInspection[];
-}> = ({ currentUserProfile, addToast, onUpdateInspection, prefilledData, onPrefillHandled, existingInspection, onEditHandled, initialTab, onInitialTabHandled, inspections }) => {
+}> = ({ currentUserProfile, addToast, removeToast, onUpdateInspection, prefilledData, onPrefillHandled, existingInspection, onEditHandled, initialTab, onInitialTabHandled, inspections }) => {
     const [activeTab, setActiveTab] = useState<ActiveCircleCenterTab>('incoming');
     const [isSaving, setIsSaving] = useState(false);
     const [autocompleteData, setAutocompleteData] = useState<AutocompleteData>({ suppliers: [], productNames: [], partNames: [], injectionColors: [], specifications: [], injectionCompanies: [] });
@@ -2326,7 +2328,7 @@ const CircleCenter: React.FC<{
                     const addedUrls = await Promise.all(
                         imageFiles.map(async (file, index) => {
                             const uniqueFileName = `${Date.now()}-${file.name}`;
-                            const imageRef = storage.ref(`quality-inspection-images/${docId}/${uniqueFileName}`);
+                            const imageRef = storage.ref(`quality-inspections/${docId}/${uniqueFileName}`);
                             const snapshot = await imageRef.put(file);
                             const downloadURL = await snapshot.ref.getDownloadURL();
                             
@@ -2348,6 +2350,9 @@ const CircleCenter: React.FC<{
                     await db.collection('quality-inspections').doc(docId).update({
                         imageUrls: [...remainingImages, ...addedUrls]
                     });
+                    
+                    // Progress 토스트 제거하고 완료 토스트 표시
+                    removeToast(progressToastId);
                     addToast({ message: `이미지 ${addedUrls.length}개 업로드 완료`, type: 'success' });
                 } else if (deletedImages.length > 0) {
                     // 새 이미지가 없고 삭제만 있는 경우
@@ -2401,6 +2406,7 @@ const CircleCenter: React.FC<{
                 const newDocRef = await db.collection('quality-inspections').add(payload);
     
                  if (imageFiles.length > 0) {
+                    const progressToastId = Date.now() + Math.random();
                     addToast({ 
                         message: `이미지 업로드 중...`, 
                         type: 'progress',
@@ -2425,6 +2431,9 @@ const CircleCenter: React.FC<{
                         })
                     );
                     await newDocRef.update({ imageUrls });
+                    
+                    // Progress 토스트 제거하고 완료 토스트 표시
+                    removeToast(progressToastId);
                     addToast({ message: `이미지 ${imageUrls.length}개 업로드 완료`, type: 'success' });
                 }
 
@@ -2518,7 +2527,7 @@ const CircleCenter: React.FC<{
 };
 
 // FIX: Changed to a named export to resolve module import error in App.tsx.
-export const QualityControlCenter: React.FC<QualityControlCenterProps> = ({ theme, setTheme, currentUserProfile, addToast, deepLinkOrderNumber, onDeepLinkHandled, onUpdateInspection, onDeleteInspectionGroup, onAddComment }) => {
+export const QualityControlCenter: React.FC<QualityControlCenterProps> = ({ theme, setTheme, currentUserProfile, addToast, removeToast, deepLinkOrderNumber, onDeepLinkHandled, onUpdateInspection, onDeleteInspectionGroup, onAddComment }) => {
   const [activeMenu, setActiveMenu] = useState<ActiveQualityMenu>('dashboard');
   const [inspections, setInspections] = useState<QualityInspection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -2646,7 +2655,7 @@ export const QualityControlCenter: React.FC<QualityControlCenterProps> = ({ them
         case 'controlCenter':
             return <ControlCenter groupedData={groupedInspections} isLoading={isLoading} onSelectDetails={setSelectedDetails} filters={dashboardFilters} onClearFilters={() => setDashboardFilters(null)} />;
         case 'circleCenter':
-            return <CircleCenter currentUserProfile={currentUserProfile} addToast={addToast} onUpdateInspection={onUpdateInspection} inspections={inspections} prefilledData={prefilledData} onPrefillHandled={() => setPrefilledData(null)} existingInspection={editingInspection} onEditHandled={() => setEditingInspection(null)} initialTab={initialCircleCenterTab} onInitialTabHandled={() => setInitialCircleCenterTab(null)} />;
+            return <CircleCenter currentUserProfile={currentUserProfile} addToast={addToast} removeToast={removeToast} onUpdateInspection={onUpdateInspection} inspections={inspections} prefilledData={prefilledData} onPrefillHandled={() => setPrefilledData(null)} existingInspection={editingInspection} onEditHandled={() => setEditingInspection(null)} initialTab={initialCircleCenterTab} onInitialTabHandled={() => setInitialCircleCenterTab(null)} />;
         case 'team':
             return <TeamManagement />;
         default:
