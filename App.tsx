@@ -162,6 +162,10 @@ export const App: React.FC = () => {
     setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
   }, []);
 
+  const removeAllProgressToasts = useCallback(() => {
+    setToasts(prevToasts => prevToasts.filter(toast => toast.type !== 'progress'));
+  }, []);
+
   const addToast = useCallback((toast: { message: string; type: ToastType; progress?: { current: number; total: number } }) => {
     const id = Date.now() + Math.random();
     setToasts(prevToasts => [...prevToasts, { ...toast, id }]);
@@ -1859,7 +1863,7 @@ export const App: React.FC = () => {
           case 'jig':
               return <div className="p-2 sm:p-4 flex flex-col"><Navigation activeMenu={activeMenu} onSelect={setActiveMenu} currentUserProfile={currentUserProfile} /><div className="mt-4 flex-1 overflow-hidden">{renderJigContent()}</div></div>;
           case 'quality':
-              return <QualityControlCenter theme={theme} setTheme={handleSetTheme} currentUserProfile={currentUserProfile} addToast={addToast} removeToast={removeToast} deepLinkOrderNumber={qualityDeepLink} onDeepLinkHandled={() => setQualityDeepLink(null)} onUpdateInspection={handleUpdateQualityInspection} onDeleteInspectionGroup={handleDeleteInspectionGroup} onAddComment={handleAddQualityComment}/>;
+              return <QualityControlCenter theme={theme} setTheme={handleSetTheme} currentUserProfile={currentUserProfile} addToast={addToast} removeToast={removeToast} removeAllProgressToasts={removeAllProgressToasts} deepLinkOrderNumber={qualityDeepLink} onDeepLinkHandled={() => setQualityDeepLink(null)} onUpdateInspection={handleUpdateQualityInspection} onDeleteInspectionGroup={handleDeleteInspectionGroup} onAddComment={handleAddQualityComment}/>;
           case 'work':
               return <div className="p-2 sm:p-4"><WorkPerformanceCenter addToast={addToast} currentUserProfile={currentUserProfile} productionRequests={productionRequests} onOpenNewProductionRequest={handleOpenNewProductionRequest} onSelectProductionRequest={handleSelectProductionRequest} productionSchedules={productionSchedules} onSaveProductionSchedules={handleSaveProductionSchedules} onDeleteProductionSchedule={handleDeleteProductionSchedule} onDeleteProductionSchedulesByDate={handleDeleteProductionSchedulesByDate} orders={orders} onSaveOrders={handleSaveOrders} /></div>;
           case 'sample':
