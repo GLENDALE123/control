@@ -2331,13 +2331,11 @@ const CircleCenter: React.FC<{
                     for (let index = 0; index < imageFiles.length; index++) {
                         const file = imageFiles[index];
                         try {
-                            // 파일을 ArrayBuffer로 읽어서 손상 방지
-                            const arrayBuffer = await file.arrayBuffer();
                             const uniqueFileName = `${Date.now()}-${file.name}`;
                             const imageRef = storage.ref(`quality-inspections/${docId}/${uniqueFileName}`);
                             
-                            // uploadBytes 사용 (최신 API)
-                            const snapshot = await uploadBytes(imageRef, arrayBuffer, {
+                            // uploadBytes 사용 (최신 API) - File 객체 직접 사용
+                            const snapshot = await uploadBytes(imageRef, file, {
                                 contentType: file.type || 'image/jpeg',
                                 customMetadata: {
                                     originalName: file.name,
@@ -2356,7 +2354,8 @@ const CircleCenter: React.FC<{
                             addedUrls.push(downloadURL);
                         } catch (error) {
                             console.error(`이미지 업로드 실패 (${file.name}):`, error);
-                            throw new Error(`이미지 업로드 실패: ${file.name}`);
+                            const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+                            throw new Error(`이미지 업로드 실패 (${file.name}): ${errorMessage}`);
                         }
                     }
                     
@@ -2433,13 +2432,11 @@ const CircleCenter: React.FC<{
                     for (let index = 0; index < imageFiles.length; index++) {
                         const file = imageFiles[index];
                         try {
-                            // 파일을 ArrayBuffer로 읽어서 손상 방지
-                            const arrayBuffer = await file.arrayBuffer();
                             const uniqueFileName = `${Date.now()}-${file.name}`;
                             const imageRef = storage.ref(`quality-inspection-images/${newDocRef.id}/${uniqueFileName}`);
                             
-                            // uploadBytes 사용 (최신 API)
-                            const snapshot = await uploadBytes(imageRef, arrayBuffer, {
+                            // uploadBytes 사용 (최신 API) - File 객체 직접 사용
+                            const snapshot = await uploadBytes(imageRef, file, {
                                 contentType: file.type || 'image/jpeg',
                                 customMetadata: {
                                     originalName: file.name,
@@ -2458,7 +2455,8 @@ const CircleCenter: React.FC<{
                             imageUrls.push(downloadURL);
                         } catch (error) {
                             console.error(`이미지 업로드 실패 (${file.name}):`, error);
-                            throw new Error(`이미지 업로드 실패: ${file.name}`);
+                            const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+                            throw new Error(`이미지 업로드 실패 (${file.name}): ${errorMessage}`);
                         }
                     }
                     await newDocRef.update({ imageUrls });
