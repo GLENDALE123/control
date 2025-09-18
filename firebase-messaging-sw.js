@@ -15,6 +15,13 @@ try {
   });
 
   const messaging = firebase.messaging();
+  // Deduplication set for message IDs
+  const displayedMessageIds = new Set();
+
+  function getMessageId(payload) {
+    return (payload && (payload.messageId || (payload.data && (payload.data['google.message_id'] || payload.data['message_id'])))) || undefined;
+  }
+
   function buildOptions(payload) {
     const n = payload?.notification || {};
     return {
@@ -22,7 +29,7 @@ try {
       icon: n.icon || undefined,
       data: payload?.data || {},
       vibrate: [150, 80, 150],
-      tag: (payload?.data && payload.data.tag) || 'tms-notification',
+      tag: (payload?.data && (payload.data.tag || getMessageId(payload))) || 'tms-notification',
       renotify: true,
       requireInteraction: false,
       actions: [
@@ -32,17 +39,26 @@ try {
     };
   }
 
+  function maybeShowNotification(payload) {
+    // If notification payload exists, the browser may auto-show; avoid double showing
+    if (payload && payload.notification) {
+      return; // Let the platform handle it
+    }
+    const msgId = getMessageId(payload);
+    if (msgId && displayedMessageIds.has(msgId)) return;
+    if (msgId) displayedMessageIds.add(msgId);
+    const title = (payload?.data && (payload.data.title)) || '알림';
+    const options = buildOptions(payload);
+    self.registration.showNotification(title, options);
+  }
+
   if (messaging && typeof messaging.onBackgroundMessage === 'function') {
     messaging.onBackgroundMessage(function (payload) {
-      const title = (payload?.notification?.title) || '알림';
-      const options = buildOptions(payload);
-      self.registration.showNotification(title, options);
+      maybeShowNotification(payload);
     });
   } else if (messaging && typeof messaging.setBackgroundMessageHandler === 'function') {
     messaging.setBackgroundMessageHandler(function (payload) {
-      const title = (payload?.notification?.title) || '알림';
-      const options = buildOptions(payload);
-      return self.registration.showNotification(title, options);
+      maybeShowNotification(payload);
     });
   }
 

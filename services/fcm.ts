@@ -39,11 +39,27 @@ export async function initFCM(): Promise<FcmInitResult> {
       });
     }
 
-    // onMessage 리스너는 한 번만 등록
-    messaging.onMessage(async (payload) => {
-      // 브라우저가 자동으로 알림을 표시하므로 별도로 showNotification 호출하지 않음
-      console.log('FCM 메시지 수신:', payload);
-    });
+    // onMessage 리스너는 한 번만 등록하고, notification payload가 있으면 수동 표시하지 않음
+    const globalAny: any = (window as any);
+    if (!globalAny.__FCM_onMessageRegistered) {
+      globalAny.__FCM_onMessageRegistered = true;
+      messaging.onMessage(async (payload) => {
+        try {
+          // 대부분의 브라우저는 notification payload를 자동 표시하므로 중복 방지
+          if ((payload as any)?.notification) return;
+          if (document.hidden) return; // 백그라운드는 SW가 처리
+          const registration = await navigator.serviceWorker.getRegistration();
+          if (!registration) return;
+          const title = (payload as any)?.data?.title || '알림';
+          const body = (payload as any)?.data?.body || '';
+          const icon = (payload as any)?.data?.icon;
+          const tag = (payload as any)?.data?.tag || (payload as any)?.data?.['google.message_id'] || 'tms-notification';
+          await registration.showNotification(title, { body, icon, data: (payload as any)?.data || {}, tag });
+        } catch (e) {
+          // no-op
+        }
+      });
+    }
 
     return { token, permission };
   } catch (e) {
