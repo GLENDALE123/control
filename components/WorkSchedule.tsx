@@ -216,8 +216,8 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
                 <html>
                   <head>
                     <title>​</title>
-                    <style>
-                      @page { size: A4 landscape; margin: 10mm; }
+                     <style>
+                       @page { size: A4 landscape; margin: 0; }
                       html, body { margin: 0; padding: 0; height: 100%; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                       .page { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
                       .page img { display:block; max-width: 100%; max-height: 100%; width: auto; height: auto; page-break-inside: avoid; image-rendering: -webkit-optimize-contrast; }
@@ -319,7 +319,7 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
                 <div 
                     key={dateStr}
                     className={`
-                        ${isYearView ? 'h-8' : 'px-2 py-1 border-t border-r border-slate-700 flex flex-col'}
+                         ${isYearView ? 'h-8' : 'px-2 py-1 border-t border-r border-slate-700 flex flex-col min-h-24'}
                         ${canManage && !isYearView ? 'cursor-pointer hover:bg-slate-700' : ''}
                         ${isSelected ? 'outline outline-2 outline-yellow-400' : ''}
                     `}
@@ -330,11 +330,11 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
                     </span>
                     {!isYearView && (
                          <div className={`text-xs mt-1 space-y-1 ${isPrintMode ? 'overflow-visible whitespace-pre-wrap break-words' : 'overflow-hidden'}`}>
-                            {holiday && <p className="text-red-400 truncate font-semibold">{holiday}</p>}
+                             {holiday && <p className={`${isPrintMode ? '' : 'truncate'} text-red-400 font-semibold`}>{holiday}</p>}
                             {schedule && (
                                 <>
                                     <p className={`${isPrintMode ? '' : 'truncate'} font-semibold`} style={{ color: WORK_TYPES[schedule.type as keyof typeof WORK_TYPES]?.color }}>• {schedule.type}</p>
-                                    <p className={`${isPrintMode ? '' : 'truncate'} text-slate-400`}>{schedule.description}</p>
+                                     <p className={`${isPrintMode ? '' : 'truncate'} text-slate-400`}>{schedule.description}</p>
                                 </>
                             )}
                         </div>
