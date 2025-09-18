@@ -3,6 +3,9 @@ import ThemeToggle from './ThemeToggle';
 import AppIcon from './AppIcon';
 import { UserProfile, UserRole } from '../types';
 import { db } from '../firebaseConfig';
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/auth';
+
 
 type Theme = 'light' | 'dark';
 
@@ -108,6 +111,24 @@ const UserManagement: React.FC<{ currentUserProfile: UserProfile | null }> = ({ 
 
 
 const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile }) => {
+  const [notifPrefs, setNotifPrefs] = useState<{ jig: boolean; work: boolean; quality: boolean; sample: boolean }>({ jig: true, work: true, quality: true, sample: true });
+
+  useEffect(() => {
+    const user = firebase.auth().currentUser;
+    if (!user) return;
+    const ref = db.collection('users').doc(user.uid).collection('preferences').doc('singleton');
+    const unsub = ref.onSnapshot((snap) => {
+      const data = (snap.data() as any) || {};
+      setNotifPrefs({
+        jig: data?.notificationPrefs?.jig !== false,
+        work: data?.notificationPrefs?.work !== false,
+        quality: data?.notificationPrefs?.quality !== false,
+        sample: data?.notificationPrefs?.sample !== false,
+      });
+    });
+    return () => unsub();
+  }, []);
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg h-full overflow-auto">
       <div className="p-6">
@@ -123,9 +144,67 @@ const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile
 
           {currentUserProfile?.role === 'Admin' && <UserManagement currentUserProfile={currentUserProfile} />}
 
+          {/* 알림 설정 (FCM 복구 시 표시) */}
           <div className="p-4 border dark:border-slate-700 rounded-lg">
-             <h3 className="text-lg font-semibold text-gray-700 dark:text-slate-200 mb-4">앱 정보</h3>
-             <div className="flex flex-col sm:flex-row items-center gap-6">
+            <h3 className="text-lg font-semibold text-gray-700 dark:text-slate-200 mb-2">알림 설정</h3>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mb-3">공지는 모든 사용자에게 공통 발송됩니다. 아래에서 나머지 카테고리를 개별 설정할 수 있어요.</p>
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4">
+              {[
+                { key: 'jig', label: '지그' },
+                { key: 'work', label: '생산' },
+                { key: 'quality', label: '품질' },
+                { key: 'sample', label: '샘플' },
+              ].map(({ key, label }) => {
+                const isOn = (notifPrefs as any)[key] === true;
+                return (
+                  <div key={key} className="inline-flex items-center gap-3">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={isOn}
+                      onClick={async () => {
+                        const user = firebase.auth().currentUser;
+                        if (!user) return;
+                        const next = !isOn;
+
+                        // When turning ON, ensure notification permission is granted
+                        if (next) {
+                          try {
+                            if (typeof window !== 'undefined' && 'Notification' in window) {
+                              let perm: NotificationPermission = Notification.permission;
+                              if (perm === 'default') {
+                                perm = await Notification.requestPermission();
+                              }
+                              if (perm !== 'granted') {
+                                alert('브라우저 알림 권한이 필요합니다. 사이트 설정에서 알림을 허용해 주세요.');
+                                return; // Do not toggle on if permission not granted
+                              }
+                              // App 부팅 시 FCM 초기화됨(index.tsx). 여기서는 권한만 보장.
+                            }
+                          } catch (e) {
+                            // Safe fallback; continue without blocking UI if something goes wrong
+                          }
+                        }
+
+                        setNotifPrefs((prev) => ({ ...(prev as any), [key]: next } as any));
+                        const update: any = {};
+                        update[`notificationPrefs.${key}`] = next;
+                        await db.collection('users').doc(user.uid).collection('preferences').doc('singleton').set(update, { merge: true });
+                      }}
+                      className={`w-12 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 ${isOn ? 'bg-green-500 dark:bg-green-600 focus:ring-green-500' : 'bg-slate-300 dark:bg-slate-700 focus:ring-slate-400 dark:focus:ring-slate-500'}`}
+                    >
+                      <span className={`block w-5 h-5 bg-white rounded-full shadow transform transition-transform ${isOn ? 'translate-x-0.5' : 'translate-x-6'}`} />
+                    </button>
+                    <span className="text-sm text-gray-700 dark:text-slate-200">{label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="p-4 border dark:border-slate-700 rounded-lg">
+            <h3 className="text-lg font-semibold text-gray-700 dark:text-slate-200 mb-4">앱 정보</h3>
+            <div className="flex flex-col sm:flex-row items-center gap-6">
                 <div className="flex-shrink-0 w-32 h-32 rounded-2xl shadow-lg flex items-center justify-center overflow-hidden">
                     <AppIcon className="w-full h-full" />
                 </div>

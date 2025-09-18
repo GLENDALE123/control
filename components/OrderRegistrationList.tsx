@@ -223,7 +223,7 @@ const OrderRegistrationList: FC<OrderRegistrationListProps> = ({ orders, onSave,
     const canManage = currentUserProfile?.role === 'Admin' || currentUserProfile?.role === 'Manager';
     
     const applyDefaultFilters = useCallback(() => {
-        if (orders.length > 0) {
+        if (orders && orders.length > 0) {
             const progressOptions = new Set(orders.map(o => o.progress).filter(Boolean) as string[]);
             const excludedStatuses = ['작업완료', '발주취소', '생산보류', '외주처리'];
             excludedStatuses.forEach(status => progressOptions.delete(status));
@@ -233,7 +233,7 @@ const OrderRegistrationList: FC<OrderRegistrationListProps> = ({ orders, onSave,
     }, [orders]);
     
     useEffect(() => {
-        if (orders.length > 0 && !defaultFiltersApplied) {
+        if (orders && orders.length > 0 && !defaultFiltersApplied) {
             applyDefaultFilters();
             setDefaultFiltersApplied(true);
         }
@@ -247,7 +247,7 @@ const OrderRegistrationList: FC<OrderRegistrationListProps> = ({ orders, onSave,
 
     const columnOptions = useMemo(() => {
         const options: Record<string, string[]> = {};
-        if (orders.length === 0) return options;
+        if (!orders || orders.length === 0) return options;
         
         const keys: (keyof Order)[] = [
             'orderDate', 'category', 'orderNumber', 'client', 'productName', 'partName', 'specification', 
@@ -267,7 +267,7 @@ const OrderRegistrationList: FC<OrderRegistrationListProps> = ({ orders, onSave,
     }, [orders]);
 
     const filteredOrders = useMemo(() => {
-        let filteredData = [...orders];
+        let filteredData = [...(orders ?? [])];
 
         Object.entries(filters).forEach(([key, selectedValues]) => {
             const allOptions = columnOptions[key];

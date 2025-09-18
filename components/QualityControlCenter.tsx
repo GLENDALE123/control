@@ -1220,8 +1220,8 @@ const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
                              {!existingInspection && (
                                 <InputGroup label="이미지 첨부" className="md:col-span-2">
                                     <div className="mt-1 flex items-center gap-2">
-                                        <input type="file" ref={fileInputRef} onChange={handleImageChange} multiple accept="image/*" className="hidden" />
-                                        <input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*" capture="environment" className="hidden" />
+                                        <input type="file" ref={fileInputRef} onChange={handleImageChange} multiple accept="image/*,image/heic,image/heif" className="hidden" />
+                                        <input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*,image/heic,image/heif" className="hidden" />
                                         <button type="button" onClick={() => fileInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold border rounded-md hover:bg-slate-50 dark:hover:bg-slate-600">파일 선택</button>
                                         <button type="button" onClick={() => cameraInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold border rounded-md hover:bg-slate-50 dark:hover:bg-slate-600">사진 촬영</button>
                                     </div>
@@ -1717,8 +1717,8 @@ const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserPro
                             {!existingInspection && (
                                 <InputGroup label="이미지 첨부" className="md:col-span-2">
                                     <div className="mt-1 flex items-center gap-2">
-                                        <input type="file" ref={fileInputRef} onChange={handleImageChange} multiple accept="image/*" className="hidden" />
-                                        <input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*" capture="environment" className="hidden" />
+                                        <input type="file" ref={fileInputRef} onChange={handleImageChange} multiple accept="image/*,image/heic,image/heif" className="hidden" />
+                                        <input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*,image/heic,image/heif" className="hidden" />
                                         <button type="button" onClick={() => fileInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold border rounded-md hover:bg-slate-50 dark:hover:bg-slate-600">파일 선택</button>
                                         <button type="button" onClick={() => cameraInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold border rounded-md hover:bg-slate-50 dark:hover:bg-slate-600">사진 촬영</button>
                                     </div>
@@ -2025,8 +2025,8 @@ const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
                             {!existingInspection && (
                                 <InputGroup label="이미지 첨부" className="md:col-span-2">
                                     <div className="mt-1 flex items-center gap-2">
-                                        <input type="file" ref={fileInputRef} onChange={handleImageChange} multiple accept="image/*" className="hidden" />
-                                        <input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*" capture="environment" className="hidden" />
+                                        <input type="file" ref={fileInputRef} onChange={handleImageChange} multiple accept="image/*,image/heic,image/heif" className="hidden" />
+                                        <input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*,image/heic,image/heif" className="hidden" />
                                         <button type="button" onClick={() => fileInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold border rounded-md hover:bg-slate-50 dark:hover:bg-slate-600">파일 선택</button>
                                         <button type="button" onClick={() => cameraInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold border rounded-md hover:bg-slate-50 dark:hover:bg-slate-600">사진 촬영</button>
                                     </div>
