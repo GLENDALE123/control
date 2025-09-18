@@ -252,7 +252,7 @@ const DetailSection: React.FC<{ title: string; data?: string | null | React.Reac
     );
 };
 
-const InspectionDetailsList: React.FC<{ inspection: QualityInspection; onImageClick: (url: string) => void; }> = ({ inspection, onImageClick }) => {
+const InspectionDetailsList: React.FC<{ inspection: QualityInspection; onImageClick: (url: string) => void; canManage?: boolean; }> = ({ inspection, onImageClick, canManage = false }) => {
     const renderStructuredResult = (title: string, data?: TestResultDetail | string | null) => {
         if (!data) return null;
         let content;
@@ -299,19 +299,20 @@ const InspectionDetailsList: React.FC<{ inspection: QualityInspection; onImageCl
                     <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">첨부 이미지</dt>
                     <dd className="mt-1 grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
                         {inspection.imageUrls.map((url, index) => (
-                            <img
-                                key={index}
-                                src={url}
-                                alt=""
-                                aria-label={`첨부 이미지 ${index + 1}`}
-                                width={160}
-                                height={96}
-                                loading="lazy"
-                                decoding="async"
-                                fetchpriority="low"
-                                className="w-full h-24 object-cover rounded-md cursor-pointer transition-transform hover:scale-105"
-                                onClick={() => onImageClick(url)}
-                            />
+                            <div key={index} className="group relative">
+                                <img
+                                    src={url}
+                                    alt=""
+                                    aria-label={`첨부 이미지 ${index + 1}`}
+                                    width={160}
+                                    height={96}
+                                    loading="lazy"
+                                    decoding="async"
+                                    fetchpriority="low"
+                                    className="w-full h-24 object-cover rounded-md cursor-pointer transition-transform hover:scale-105"
+                                    onClick={() => onImageClick(url)}
+                                />
+                            </div>
                         ))}
                     </dd>
                 </div>
@@ -468,7 +469,7 @@ const InspectionSection: React.FC<{ title: string; inspections: QualityInspectio
                                 <button onClick={() => onEdit(inspection)} className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">수정</button>
                             )}
                         </div>
-                        <InspectionDetailsList inspection={inspection} onImageClick={onImageClick} />
+                        <InspectionDetailsList inspection={inspection} onImageClick={onImageClick} canManage={canManage} />
                     </div>
                 ))}
             </div>
@@ -1005,7 +1006,7 @@ const QuantityInput: React.FC<{ value: string; onChange: (e: React.ChangeEvent<H
 
 interface InspectionFormProps {
     currentUserProfile: UserProfile | null;
-    onSubmit: (data: any, imageFiles: File[]) => void;
+    onSubmit: (data: any, imageFiles: File[], deletedImages?: string[]) => void;
     onCancel?: () => void;
     existingInspection?: QualityInspection | null;
     isSaving: boolean;
@@ -1046,8 +1047,18 @@ const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
     const [formData, setFormData] = useState(getInitialState());
     const [imageFiles, setImageFiles] = useState<File[]>([]);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    const [existingImages, setExistingImages] = useState<string[]>([]);
+    const [deletedImages, setDeletedImages] = useState<string[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
+
+     useEffect(() => {
+        // Load existing images when in edit mode
+        if (existingInspection && existingInspection.imageUrls && existingInspection.imageUrls.length > 0) {
+            setExistingImages(existingInspection.imageUrls);
+            setImagePreviews(existingInspection.imageUrls);
+        }
+    }, [existingInspection]);
 
      useEffect(() => {
         // Cleanup object URLs to avoid memory leaks
@@ -1066,10 +1077,28 @@ const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
     };
 
     const removeImage = (index: number) => {
-        setImageFiles(prev => prev.filter((_, i) => i !== index));
+        const imageUrl = imagePreviews[index];
+        
+        // 기존 이미지인지 새 이미지인지 확인
+        if (existingImages.includes(imageUrl)) {
+            // 기존 이미지 삭제 - deletedImages에 추가
+            setDeletedImages(prev => [...prev, imageUrl]);
+        } else {
+            // 새 이미지 삭제 - imageFiles에서 제거
+            const fileIndex = imagePreviews.findIndex((_, i) => i === index) - existingImages.length;
+            if (fileIndex >= 0) {
+                setImageFiles(prev => prev.filter((_, i) => i !== fileIndex));
+            }
+        }
+        
+        // 미리보기에서 제거
         setImagePreviews(prev => {
-            URL.revokeObjectURL(prev[index]);
-            return prev.filter((_, i) => i !== index);
+            const newPreviews = prev.filter((_, i) => i !== index);
+            // 새 이미지가 아닌 경우 URL 정리
+            if (!existingImages.includes(imageUrl)) {
+                URL.revokeObjectURL(imageUrl);
+            }
+            return newPreviews;
         });
     };
     
@@ -1149,7 +1178,15 @@ const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
             ...formData,
             keywordPairs: formData.keywordPairs.filter(p => p.process.trim() !== '' || p.defect.trim() !== ''),
         };
-        onSubmit(submissionData, imageFiles);
+        onSubmit(submissionData, imageFiles, deletedImages);
+        
+        // Clear image states after form submission
+        setTimeout(() => {
+            setImagePreviews([]);
+            setImageFiles([]);
+            setExistingImages([]);
+            setDeletedImages([]);
+        }, 100);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
@@ -1223,7 +1260,10 @@ const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
                             <InputGroup label="외관검사이력"><TextAreaInput name="appearanceHistory" value={formData.appearanceHistory} onChange={handleChange} /></InputGroup>
                             <InputGroup label="기능검사이력"><TextAreaInput name="functionHistory" value={formData.functionHistory} onChange={handleChange} /></InputGroup>
                             
-                             {!existingInspection && (
+                             {(
+                                // 신규 + 수정 모두에서 이미지 추가 허용
+                                true
+                              ) && (
                                 <InputGroup label="이미지 첨부" className="md:col-span-2">
                                     <div className="mt-1 flex items-center gap-2">
                                         <input type="file" ref={fileInputRef} onChange={handleImageChange} multiple accept="image/*,image/heic,image/heif" className="hidden" />
@@ -1260,7 +1300,7 @@ const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
                         </form>
                     </div>
                     <div className="flex-shrink-0 p-4 border-t dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm flex justify-end gap-2">
-                        {onCancel && <button type="button" onClick={onCancel} disabled={isSaving} className="bg-gray-200 dark:bg-slate-600 text-gray-800 dark:text-white font-bold py-2.5 px-6 rounded-lg disabled:opacity-50">취소</button>}
+                        {onCancel && <button type="button" onClick={() => { setImagePreviews([]); setImageFiles([]); setExistingImages([]); setDeletedImages([]); onCancel(); }} disabled={isSaving} className="bg-gray-200 dark:bg-slate-600 text-gray-800 dark:text-white font-bold py-2.5 px-6 rounded-lg disabled:opacity-50">취소</button>}
                         <button type="submit" form="incoming-inspection-form" disabled={isSaving || !canManage} className="bg-primary-900 hover:bg-primary-800 text-white font-bold py-2.5 px-6 rounded-lg shadow-md transition-colors disabled:bg-primary-700 disabled:cursor-not-allowed flex items-center justify-center min-w-[120px]">
                         {isSaving ? (
                             <>
@@ -1322,8 +1362,18 @@ const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserPro
     const [formData, setFormData] = useState(getInitialState());
     const [imageFiles, setImageFiles] = useState<File[]>([]);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    const [existingImages, setExistingImages] = useState<string[]>([]);
+    const [deletedImages, setDeletedImages] = useState<string[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
+
+     useEffect(() => {
+        // Load existing images when in edit mode
+        if (existingInspection && existingInspection.imageUrls && existingInspection.imageUrls.length > 0) {
+            setExistingImages(existingInspection.imageUrls);
+            setImagePreviews(existingInspection.imageUrls);
+        }
+    }, [existingInspection]);
 
      useEffect(() => {
         // Cleanup object URLs to avoid memory leaks
@@ -1342,10 +1392,28 @@ const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserPro
     };
 
     const removeImage = (index: number) => {
-        setImageFiles(prev => prev.filter((_, i) => i !== index));
+        const imageUrl = imagePreviews[index];
+        
+        // 기존 이미지인지 새 이미지인지 확인
+        if (existingImages.includes(imageUrl)) {
+            // 기존 이미지 삭제 - deletedImages에 추가
+            setDeletedImages(prev => [...prev, imageUrl]);
+        } else {
+            // 새 이미지 삭제 - imageFiles에서 제거
+            const fileIndex = imagePreviews.findIndex((_, i) => i === index) - existingImages.length;
+            if (fileIndex >= 0) {
+                setImageFiles(prev => prev.filter((_, i) => i !== fileIndex));
+            }
+        }
+        
+        // 미리보기에서 제거
         setImagePreviews(prev => {
-            URL.revokeObjectURL(prev[index]);
-            return prev.filter((_, i) => i !== index);
+            const newPreviews = prev.filter((_, i) => i !== index);
+            // 새 이미지가 아닌 경우 URL 정리
+            if (!existingImages.includes(imageUrl)) {
+                URL.revokeObjectURL(imageUrl);
+            }
+            return newPreviews;
         });
     };
     
@@ -1553,7 +1621,15 @@ const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserPro
                 lineConditions: line.lineConditions?.filter(c => c.value.trim() !== '')
             })),
         };
-        onSubmit(submissionData, imageFiles);
+        onSubmit(submissionData, imageFiles, deletedImages);
+        
+        // Clear image states after form submission
+        setTimeout(() => {
+            setImagePreviews([]);
+            setImageFiles([]);
+            setExistingImages([]);
+            setDeletedImages([]);
+        }, 100);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
@@ -1720,7 +1796,10 @@ const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserPro
                                 <button type="button" onClick={addProcessLine} className="w-full py-2 border border-dashed border-gray-400 dark:border-slate-500 rounded-md text-sm hover:bg-slate-100 dark:hover:bg-slate-700">라인 정보 세트 추가</button>
                             </div>
                             
-                            {!existingInspection && (
+                            {(
+                                // 신규 + 수정 모두에서 이미지 추가 허용
+                                true
+                              ) && (
                                 <InputGroup label="이미지 첨부" className="md:col-span-2">
                                     <div className="mt-1 flex items-center gap-2">
                                         <input type="file" ref={fileInputRef} onChange={handleImageChange} multiple accept="image/*,image/heic,image/heif" className="hidden" />
@@ -1765,7 +1844,7 @@ const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserPro
                         </form>
                     </div>
                     <div className="flex-shrink-0 p-4 border-t dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm flex justify-end gap-2">
-                        {onCancel && <button type="button" onClick={onCancel} disabled={isSaving} className="bg-gray-200 dark:bg-slate-600 text-gray-800 dark:text-white font-bold py-2.5 px-6 rounded-lg disabled:opacity-50">취소</button>}
+                        {onCancel && <button type="button" onClick={() => { setImagePreviews([]); setImageFiles([]); setExistingImages([]); setDeletedImages([]); onCancel(); }} disabled={isSaving} className="bg-gray-200 dark:bg-slate-600 text-gray-800 dark:text-white font-bold py-2.5 px-6 rounded-lg disabled:opacity-50">취소</button>}
                         <button type="submit" form="in-process-inspection-form" disabled={isSaving || !canManage} className="bg-primary-900 hover:bg-primary-800 text-white font-bold py-2.5 px-6 rounded-lg shadow-md transition-colors disabled:bg-primary-700 disabled:cursor-not-allowed flex items-center justify-center min-w-[120px]">
                         {isSaving ? (
                             <>
@@ -1818,8 +1897,18 @@ const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
     const [formData, setFormData] = useState(getInitialState());
     const [imageFiles, setImageFiles] = useState<File[]>([]);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    const [existingImages, setExistingImages] = useState<string[]>([]);
+    const [deletedImages, setDeletedImages] = useState<string[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
+
+     useEffect(() => {
+        // Load existing images when in edit mode
+        if (existingInspection && existingInspection.imageUrls && existingInspection.imageUrls.length > 0) {
+            setExistingImages(existingInspection.imageUrls);
+            setImagePreviews(existingInspection.imageUrls);
+        }
+    }, [existingInspection]);
 
      useEffect(() => {
         // Cleanup object URLs to avoid memory leaks
@@ -1838,10 +1927,28 @@ const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
     };
 
     const removeImage = (index: number) => {
-        setImageFiles(prev => prev.filter((_, i) => i !== index));
+        const imageUrl = imagePreviews[index];
+        
+        // 기존 이미지인지 새 이미지인지 확인
+        if (existingImages.includes(imageUrl)) {
+            // 기존 이미지 삭제 - deletedImages에 추가
+            setDeletedImages(prev => [...prev, imageUrl]);
+        } else {
+            // 새 이미지 삭제 - imageFiles에서 제거
+            const fileIndex = imagePreviews.findIndex((_, i) => i === index) - existingImages.length;
+            if (fileIndex >= 0) {
+                setImageFiles(prev => prev.filter((_, i) => i !== fileIndex));
+            }
+        }
+        
+        // 미리보기에서 제거
         setImagePreviews(prev => {
-            URL.revokeObjectURL(prev[index]);
-            return prev.filter((_, i) => i !== index);
+            const newPreviews = prev.filter((_, i) => i !== index);
+            // 새 이미지가 아닌 경우 URL 정리
+            if (!existingImages.includes(imageUrl)) {
+                URL.revokeObjectURL(imageUrl);
+            }
+            return newPreviews;
         });
     };
     
@@ -1984,7 +2091,15 @@ const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
 
     const handleFormSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSubmit(formData, imageFiles);
+        onSubmit(formData, imageFiles, deletedImages);
+        
+        // Clear image states after form submission
+        setTimeout(() => {
+            setImagePreviews([]);
+            setImageFiles([]);
+            setExistingImages([]);
+            setDeletedImages([]);
+        }, 100);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
@@ -2028,7 +2143,10 @@ const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
                                 <InputGroup label="재검사요청 내용"><TextAreaInput name="reinspectionContent" value={formData.reinspectionContent || ''} onChange={handleChange} rows={1} /></InputGroup>
                             </div>
                             
-                            {!existingInspection && (
+                            {(
+                                // 신규 + 수정 모두에서 이미지 추가 허용
+                                true
+                              ) && (
                                 <InputGroup label="이미지 첨부" className="md:col-span-2">
                                     <div className="mt-1 flex items-center gap-2">
                                         <input type="file" ref={fileInputRef} onChange={handleImageChange} multiple accept="image/*,image/heic,image/heif" className="hidden" />
@@ -2096,7 +2214,7 @@ const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
                         </form>
                     </div>
                     <div className="flex-shrink-0 p-4 border-t dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm flex justify-end gap-2">
-                        {onCancel && <button type="button" onClick={onCancel} disabled={isSaving} className="bg-gray-200 dark:bg-slate-600 text-gray-800 dark:text-white font-bold py-2.5 px-6 rounded-lg disabled:opacity-50">취소</button>}
+                        {onCancel && <button type="button" onClick={() => { setImagePreviews([]); setImageFiles([]); setExistingImages([]); setDeletedImages([]); onCancel(); }} disabled={isSaving} className="bg-gray-200 dark:bg-slate-600 text-gray-800 dark:text-white font-bold py-2.5 px-6 rounded-lg disabled:opacity-50">취소</button>}
                         <button type="submit" form="outgoing-inspection-form" disabled={isSaving || !canManage} className="bg-primary-900 hover:bg-primary-800 text-white font-bold py-2.5 px-6 rounded-lg shadow-md transition-colors disabled:bg-primary-700 disabled:cursor-not-allowed flex items-center justify-center min-w-[120px]">
                             {isSaving ? '저장 중...' : '저장하기'}
                         </button>
@@ -2166,7 +2284,7 @@ const CircleCenter: React.FC<{
         }
     }, [prefilledData, addToast]);
     
-    const handleFormSubmit = async (formData: any, imageFiles: File[]) => {
+    const handleFormSubmit = async (formData: any, imageFiles: File[], deletedImages: string[] = []) => {
         if (!currentUserProfile) {
             addToast({ message: '로그인이 필요합니다.', type: 'error' });
             return;
@@ -2181,6 +2299,66 @@ const CircleCenter: React.FC<{
                 }
                 const { id, createdAt, history, inspector, ...dataToSave } = formData;
                 await onUpdateInspection(docId, dataToSave, '사용자에 의해 수정됨');
+
+                // 이미지 삭제 처리 (Storage에서 삭제)
+                if (deletedImages.length > 0) {
+                    await Promise.all(
+                        deletedImages.map(async (url) => {
+                            try {
+                                const ref = storage.refFromURL(url);
+                                await ref.delete();
+                            } catch (error) {
+                                console.error('Failed to delete image:', error);
+                            }
+                        })
+                    );
+                }
+
+                // 이미지 추가/교체 업로드 처리
+                if (imageFiles && imageFiles.length > 0) {
+                    const progressToastId = Date.now() + Math.random();
+                    addToast({ 
+                        message: `이미지 업로드 중...`, 
+                        type: 'progress',
+                        progress: { current: 0, total: imageFiles.length }
+                    });
+                    
+                    const addedUrls = await Promise.all(
+                        imageFiles.map(async (file, index) => {
+                            const uniqueFileName = `${Date.now()}-${file.name}`;
+                            const imageRef = storage.ref(`quality-inspection-images/${docId}/${uniqueFileName}`);
+                            const snapshot = await imageRef.put(file);
+                            const downloadURL = await snapshot.ref.getDownloadURL();
+                            
+                            // 진행도 업데이트
+                            addToast({ 
+                                message: `이미지 업로드 중...`, 
+                                type: 'progress',
+                                progress: { current: index + 1, total: imageFiles.length }
+                            });
+                            
+                            return downloadURL;
+                        })
+                    );
+                    
+                    // 기존 목록에서 삭제된 것 제외하고 새 이미지 추가
+                    const docSnap = await db.collection('quality-inspections').doc(docId).get();
+                    const prev = (docSnap.data()?.imageUrls as string[]) || [];
+                    const remainingImages = prev.filter(img => !deletedImages.includes(img));
+                    await db.collection('quality-inspections').doc(docId).update({
+                        imageUrls: [...remainingImages, ...addedUrls]
+                    });
+                    addToast({ message: `이미지 ${addedUrls.length}개 업로드 완료`, type: 'success' });
+                } else if (deletedImages.length > 0) {
+                    // 새 이미지가 없고 삭제만 있는 경우
+                    const docSnap = await db.collection('quality-inspections').doc(docId).get();
+                    const prev = (docSnap.data()?.imageUrls as string[]) || [];
+                    const remainingImages = prev.filter(img => !deletedImages.includes(img));
+                    await db.collection('quality-inspections').doc(docId).update({
+                        imageUrls: remainingImages
+                    });
+                }
+
                 addToast({ message: '검사 정보가 성공적으로 수정되었습니다.', type: 'success' });
                 onEditHandled();
             } else {
@@ -2223,18 +2401,31 @@ const CircleCenter: React.FC<{
                 const newDocRef = await db.collection('quality-inspections').add(payload);
     
                  if (imageFiles.length > 0) {
-                    addToast({ message: `이미지 업로드 중... (0/${imageFiles.length})`, type: 'info' });
+                    addToast({ 
+                        message: `이미지 업로드 중...`, 
+                        type: 'progress',
+                        progress: { current: 0, total: imageFiles.length }
+                    });
+                    
                     const imageUrls = await Promise.all(
                         imageFiles.map(async (file, index) => {
                             const uniqueFileName = `${Date.now()}-${file.name}`;
                             const imageRef = storage.ref(`quality-inspection-images/${newDocRef.id}/${uniqueFileName}`);
                             const snapshot = await imageRef.put(file);
                             const downloadURL = await snapshot.ref.getDownloadURL();
-                            addToast({ message: `이미지 업로드 중... (${index + 1}/${imageFiles.length})`, type: 'info' });
+                            
+                            // 진행도 업데이트
+                            addToast({ 
+                                message: `이미지 업로드 중...`, 
+                                type: 'progress',
+                                progress: { current: index + 1, total: imageFiles.length }
+                            });
+                            
                             return downloadURL;
                         })
                     );
                     await newDocRef.update({ imageUrls });
+                    addToast({ message: `이미지 ${imageUrls.length}개 업로드 완료`, type: 'success' });
                 }
 
                 await db.collection('notifications').add({

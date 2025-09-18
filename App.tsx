@@ -44,12 +44,16 @@ import 'firebase/compat/auth';
 
 type ActiveMenu = 'dashboard' | 'ledger' | 'jigList' | 'master';
 type Theme = 'light' | 'dark';
-type ToastType = 'success' | 'error' | 'info';
+type ToastType = 'success' | 'error' | 'info' | 'progress';
 
 interface Toast {
   id: number;
   message: string;
   type: ToastType;
+  progress?: {
+    current: number;
+    total: number;
+  };
 }
 
 // FIX: Add 'detail' to the view property to allow for sample request detail modals.
@@ -69,24 +73,44 @@ const sortRequests = (requestList: JigRequest[]): JigRequest[] => {
   });
 };
 
-const ToastComponent: React.FC<{ message: string; type: ToastType; onRemove: () => void }> = ({ message, type, onRemove }) => {
+const ToastComponent: React.FC<{ message: string; type: ToastType; progress?: { current: number; total: number }; onRemove: () => void }> = ({ message, type, progress, onRemove }) => {
     const bgColor = {
         success: 'bg-green-500',
         error: 'bg-red-500',
         info: 'bg-blue-500',
+        progress: 'bg-blue-500',
     }[type];
 
     const icon = {
         success: <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
         error: <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
         info: <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+        progress: <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
     };
 
+    const progressPercentage = progress ? (progress.current / progress.total) * 100 : 0;
+
     return (
-        <div className={`flex items-center ${bgColor} text-white py-3 px-4 rounded-lg shadow-lg animate-toast-in`}>
-            <div className="mr-3">{icon[type]}</div>
-            <div className="flex-1">{message}</div>
-            <button onClick={onRemove} className="ml-4 text-xl font-semibold">&times;</button>
+        <div className={`flex flex-col ${bgColor} text-white py-3 px-4 rounded-lg shadow-lg animate-toast-in`}>
+            <div className="flex items-center">
+                <div className="mr-3">{icon[type]}</div>
+                <div className="flex-1">{message}</div>
+                <button onClick={onRemove} className="ml-4 text-xl font-semibold">&times;</button>
+            </div>
+            {progress && (
+                <div className="mt-2">
+                    <div className="flex justify-between text-sm mb-1">
+                        <span>{progress.current}/{progress.total}</span>
+                        <span>{Math.round(progressPercentage)}%</span>
+                    </div>
+                    <div className="w-full bg-white/20 rounded-full h-2">
+                        <div 
+                            className="bg-white h-2 rounded-full transition-all duration-300 ease-out"
+                            style={{ width: `${progressPercentage}%` }}
+                        ></div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -95,7 +119,7 @@ const ToastContainer: React.FC<{ toasts: Toast[]; onRemove: (id: number) => void
     return (
         <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[100] space-y-2 w-full max-w-sm">
             {toasts.map(toast => (
-                <ToastComponent key={toast.id} message={toast.message} type={toast.type} onRemove={() => onRemove(toast.id)} />
+                <ToastComponent key={toast.id} message={toast.message} type={toast.type} progress={toast.progress} onRemove={() => onRemove(toast.id)} />
             ))}
         </div>
     );
@@ -138,12 +162,16 @@ export const App: React.FC = () => {
     setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
   }, []);
 
-  const addToast = useCallback((toast: { message: string; type: ToastType }) => {
+  const addToast = useCallback((toast: { message: string; type: ToastType; progress?: { current: number; total: number } }) => {
     const id = Date.now() + Math.random();
     setToasts(prevToasts => [...prevToasts, { ...toast, id }]);
-    setTimeout(() => {
-      removeToast(id);
-    }, 3000);
+    
+    // Progress 토스트는 자동으로 제거하지 않음 (수동으로 제거해야 함)
+    if (toast.type !== 'progress') {
+      setTimeout(() => {
+        removeToast(id);
+      }, 3000);
+    }
   }, [removeToast]);
 
   useEffect(() => {
