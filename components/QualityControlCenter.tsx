@@ -1018,7 +1018,7 @@ interface InspectionFormProps {
 
 // --- Incoming Inspection Form ---
 const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProfile, onSubmit, onCancel, existingInspection, isSaving, canManage, autocompleteData, addToast, prefilledData }) => {
-    const [mobileView, setMobileView] = useState<'form' | 'preview'>('form');
+    const [mobileView, setMobileView] = useState<'form' | 'preview'>(existingInspection ? 'form' : 'form');
 
     const getInitialState = () => ({
         inspectionDate: getLocalDate(), 
@@ -1207,7 +1207,7 @@ const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
                 </div>
             </div>
             <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
-                <div className={`flex-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm ${mobileView === 'preview' ? 'hidden lg:block' : 'block'} flex flex-col overflow-hidden`}>
+                <div className={`flex-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm ${existingInspection ? 'block' : (mobileView === 'preview' ? 'hidden lg:block' : 'block')} flex flex-col overflow-hidden`}>
                     <div className="flex-1 overflow-y-auto scrollbar-hide p-6">
                         <h2 className="text-xl font-bold mb-6 text-gray-800 dark:text-white">{existingInspection ? '수입검사 수정' : '수입검사'}</h2>
                         <form id="incoming-inspection-form" onSubmit={handleFormSubmit} onKeyDown={handleKeyDown} className="space-y-5">
@@ -1327,7 +1327,7 @@ const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
 
 // --- In-Process Inspection Form ---
 const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProfile, onSubmit, onCancel, existingInspection, isSaving, canManage, autocompleteData, addToast, prefilledData }) => {
-    const [mobileView, setMobileView] = useState<'form' | 'preview'>('form');
+    const [mobileView, setMobileView] = useState<'form' | 'preview'>(existingInspection ? 'form' : 'form');
     
     const getInitialState = () => ({
         inspectionDate: getLocalDate(),
@@ -1649,7 +1649,7 @@ const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserPro
                 </div>
             </div>
             <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
-                <div className={`flex-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm ${mobileView === 'preview' ? 'hidden lg:block' : 'block'} flex flex-col overflow-hidden`}>
+                <div className={`flex-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm ${existingInspection ? 'block' : (mobileView === 'preview' ? 'hidden lg:block' : 'block')} flex flex-col overflow-hidden`}>
                     <div className="flex-1 overflow-y-auto scrollbar-hide p-6">
                         <h2 className="text-xl font-bold mb-6 text-gray-800 dark:text-white">{existingInspection ? '공정검사 수정' : '공정검사'}</h2>
                         <form id="in-process-inspection-form" onSubmit={handleFormSubmit} onKeyDown={handleKeyDown} className="space-y-5">
@@ -1871,7 +1871,7 @@ const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserPro
 
 // --- Outgoing Inspection Form ---
 const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProfile, onSubmit, onCancel, existingInspection, isSaving, canManage, autocompleteData, addToast, prefilledData }) => {
-    const [mobileView, setMobileView] = useState<'form' | 'preview'>('form');
+    const [mobileView, setMobileView] = useState<'form' | 'preview'>(existingInspection ? 'form' : 'form');
     
     const getInitialState = () => ({
         inspectionDate: getLocalDate(),
@@ -2119,7 +2119,7 @@ const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
                 </div>
             </div>
             <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
-                <div className={`flex-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm ${mobileView === 'preview' ? 'hidden lg:block' : 'block'} flex flex-col overflow-hidden`}>
+                <div className={`flex-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm ${existingInspection ? 'block' : (mobileView === 'preview' ? 'hidden lg:block' : 'block')} flex flex-col overflow-hidden`}>
                     <div className="flex-1 overflow-y-auto scrollbar-hide p-6">
                         <h2 className="text-xl font-bold mb-6 text-gray-800 dark:text-white">{existingInspection ? '출하검사 수정' : '출하검사'}</h2>
                         <form id="outgoing-inspection-form" onSubmit={handleFormSubmit} onKeyDown={handleKeyDown} className="space-y-5">
