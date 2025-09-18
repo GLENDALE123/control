@@ -219,8 +219,8 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
                      <style>
                       @page { size: A4 landscape; margin: 0; }
                       html, body { margin: 0; padding: 0; height: 100%; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                      /* A4 고정 컨테이너로 화면 크기와 무관한 일관 레이아웃 유지 */
-                      .page { width: 297mm; height: 210mm; display: flex; align-items: center; justify-content: center; }
+                      /* A4 고정 컨테이너 (높이를 약간 축소하여 2페이지 생성 방지) */
+                      .page { width: 297mm; height: 209mm; display: flex; align-items: center; justify-content: center; overflow: hidden; page-break-after: avoid; page-break-before: avoid; page-break-inside: avoid; padding: 0 5mm; box-sizing: border-box; }
                       .page img { display:block; width: 100%; height: 100%; object-fit: contain; page-break-inside: avoid; image-rendering: -webkit-optimize-contrast; }
                     </style>
                   </head>
