@@ -14,6 +14,19 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
+      },
+      build: {
+        rollupOptions: {
+          input: {
+            main: './index.html',
+            'firebase-messaging-sw': './firebase-messaging-sw.js'
+          },
+          output: {
+            entryFileNames: (chunkInfo) => {
+              return chunkInfo.name === 'firebase-messaging-sw' ? 'firebase-messaging-sw.js' : 'assets/[name]-[hash].js';
+            }
+          }
+        }
       }
     };
 });
