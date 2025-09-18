@@ -292,12 +292,12 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
         }
 
         while (days.length < totalCells) {
-            days.push(<div key={`empty-fill-${days.length}`} className={!isYearView ? 'border-t border-r border-slate-700' : ''}></div>);
+            days.push(<div key={`empty-fill-${days.length}`} className={!isYearView ? 'border-t border-r border-gray-300 dark:border-slate-700' : ''}></div>);
         }
 
         return (
-            <div className={`bg-slate-800 ${isYearView ? 'p-1' : 'p-2'} rounded-lg ${!isYearView ? 'flex-1 flex flex-col' : ''}`}>
-                <h3 className={`font-bold text-center mb-2 ${isYearView ? 'text-yellow-400 text-sm' : 'py-2 bg-slate-900 text-2xl'}`}>{month + 1}월</h3>
+            <div className={`bg-gray-100 dark:bg-slate-800 ${isYearView ? 'p-1' : 'p-2'} rounded-lg ${!isYearView ? 'flex-1 flex flex-col' : ''}`}>
+                <h3 className={`font-bold text-center mb-2 ${isYearView ? 'text-yellow-400 text-sm' : 'py-2 bg-gray-200 dark:bg-slate-900 text-gray-900 dark:text-slate-200 text-2xl'}`}>{month + 1}월</h3>
                 <div className={`grid grid-cols-7 text-center ${isYearView ? 'text-xs' : 'flex-shrink-0'}`}>
                     {WEEKDAYS.map(day => <div key={day} className={`py-1 ${day === '토' ? 'text-blue-400' : ''} ${day === '일' ? 'text-red-400' : ''}`}>{day}</div>)}
                 </div>
@@ -311,21 +311,21 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
     const AdminPanel: React.FC<{ dates: Set<string>; onApply: (type: string, dates: Set<string>) => void; onDelete: (dates: Set<string>) => void; onCancel: () => void; isMobile?: boolean }> = ({ dates, onApply, onDelete, onCancel, isMobile }) => {
         const [localSelectedType, setLocalSelectedType] = useState<string | null>(null);
         return (
-             <div className="w-full bg-slate-800 p-4 rounded-lg flex flex-col gap-4 h-full">
+             <div className="w-full bg-gray-100 dark:bg-slate-800 p-4 rounded-lg flex flex-col gap-4 h-full">
                <h3 className="font-bold">{isMobile ? `${new Date(dates.values().next().value).getDate()}일 계획` : "근무 계획 입력"}</h3>
-               <p className="text-xs text-slate-400">{isMobile ? "근무 유형을 선택하고 적용하세요." : "날짜와 근무 유형을 선택한 후 '적용' 버튼을 누르세요."}</p>
+               <p className="text-xs text-gray-600 dark:text-slate-400">{isMobile ? "근무 유형을 선택하고 적용하세요." : "날짜와 근무 유형을 선택한 후 '적용' 버튼을 누르세요."}</p>
                <div className="flex-1 overflow-y-auto space-y-2 pr-2 -mr-4">
                    {Object.entries(WORK_TYPES).map(([type, data]) => (
-                       <button key={type} onClick={() => setLocalSelectedType(type)} className={`w-full text-left p-2 rounded-md transition-colors ${localSelectedType === type ? 'bg-slate-600' : 'hover:bg-slate-700'}`}>
+                       <button key={type} onClick={() => setLocalSelectedType(type)} className={`w-full text-left p-2 rounded-md transition-colors ${localSelectedType === type ? 'bg-gray-300 dark:bg-slate-600' : 'hover:bg-gray-200 dark:hover:bg-slate-700'}`}>
                            <p className="font-semibold text-sm" style={{color: data.color}}>{type}</p>
-                           <p className="text-xs text-slate-400">{data.description}</p>
+                           <p className="text-xs text-gray-600 dark:text-slate-400">{data.description}</p>
                        </button>
                    ))}
                </div>
                <div className="flex-shrink-0 space-y-2">
                    <button onClick={() => { if(localSelectedType) onApply(localSelectedType, dates) }} className="w-full py-2 bg-yellow-400 text-slate-900 font-bold rounded-md disabled:opacity-50" disabled={!localSelectedType || dates.size === 0}>적용</button>
                    <button onClick={() => onDelete(dates)} className="w-full py-2 bg-red-600 text-white font-bold rounded-md">계획 삭제</button>
-                   <button onClick={onCancel} className="w-full py-2 bg-slate-600 text-white font-bold rounded-md">선택 취소</button>
+                   <button onClick={onCancel} className="w-full py-2 bg-gray-500 dark:bg-slate-600 text-white font-bold rounded-md">선택 취소</button>
                    {!isMobile && <button onClick={handlePostToAnnouncements} disabled={isPosting} className="w-full py-2 bg-indigo-600 text-white font-bold rounded-md mt-2 disabled:opacity-50">{isPosting ? '등록 중...' : '월간 근무표 공지하기'}</button>}
                </div>
             </div>
@@ -333,23 +333,23 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
     }
     
     return (
-        <div className="h-full flex flex-col bg-slate-900 text-slate-200 font-sans">
-            <div className="flex-shrink-0 p-3 flex items-center justify-between border-b border-slate-700">
+        <div className="h-full flex flex-col bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-200 font-sans">
+            <div className="flex-shrink-0 p-3 flex items-center justify-between border-b border-gray-200 dark:border-slate-700">
                 <div className="flex items-center gap-2">
                     <NavButton onClick={() => changeYear(-1)} ariaLabel="Previous year"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" /></svg></NavButton>
                     {view === 'month' && <NavButton onClick={() => changeMonth(-1)} ariaLabel="Previous month"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></NavButton>}
                     <h2 className="text-2xl font-bold w-48 text-center">{currentDate.getFullYear()}년 {view === 'month' && `${currentDate.getMonth() + 1}월`}</h2>
                     {view === 'month' && <NavButton onClick={() => changeMonth(1)} ariaLabel="Next month"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></NavButton>}
                     <NavButton onClick={() => changeYear(1)} ariaLabel="Next year"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg></NavButton>
-                    <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1 bg-slate-700 rounded-md text-sm">Today</button>
+                    <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1 bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-slate-200 rounded-md text-sm">Today</button>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button onClick={() => setView('year')} className={`px-3 py-1 rounded-md text-sm ${view === 'year' ? 'bg-yellow-400 text-slate-900' : 'bg-slate-700'}`}>연간 보기</button>
-                    <button onClick={() => setView('month')} className={`px-3 py-1 rounded-md text-sm ${view === 'month' ? 'bg-yellow-400 text-slate-900' : 'bg-slate-700'}`}>월간 보기</button>
+                    <button onClick={() => setView('year')} className={`px-3 py-1 rounded-md text-sm ${view === 'year' ? 'bg-yellow-400 text-slate-900' : 'bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-slate-200'}`}>연간 보기</button>
+                    <button onClick={() => setView('month')} className={`px-3 py-1 rounded-md text-sm ${view === 'month' ? 'bg-yellow-400 text-slate-900' : 'bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-slate-200'}`}>월간 보기</button>
                 </div>
             </div>
             
-            <div className="flex-shrink-0 p-3 flex items-center gap-3 overflow-x-auto scrollbar-hide text-sm border-b border-slate-700">
+            <div className="flex-shrink-0 p-3 flex items-center gap-3 overflow-x-auto scrollbar-hide text-sm border-b border-gray-200 dark:border-slate-700">
                 {Object.entries(summary).map(([key, value]) => {
                     if (value === 0) return null;
                     const color = WORK_TYPES[key as keyof typeof WORK_TYPES]?.color;
@@ -373,21 +373,21 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
                            </div>
                         )}
                         {mobileSelectedDate && (
-                            <div className="lg:hidden absolute inset-0 bg-slate-900 z-10 p-4 flex flex-col animate-fade-in-up">
+                            <div className="lg:hidden absolute inset-0 bg-white dark:bg-slate-900 z-10 p-4 flex flex-col animate-fade-in-up">
                                  <div className="flex justify-between items-center mb-4">
                                     <h3 className="text-xl font-bold">{new Date(mobileSelectedDate + 'T00:00:00').toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' })}</h3>
                                     <button onClick={() => setMobileSelectedDate(null)} className="p-2 text-2xl">&times;</button>
                                  </div>
                                  {!isMobileInputVisible ? (
                                      <div className="flex-1 space-y-4">
-                                        <div className="bg-slate-800 p-4 rounded-lg">
+                                        <div className="bg-gray-100 dark:bg-slate-800 p-4 rounded-lg">
                                             <h4 className="font-semibold mb-2">계획된 근무</h4>
                                             {schedules.has(mobileSelectedDate) ? (
                                                 <div className="text-lg">
                                                     <p style={{color: WORK_TYPES[schedules.get(mobileSelectedDate)!.type as keyof typeof WORK_TYPES]?.color }}>{schedules.get(mobileSelectedDate)!.type}</p>
-                                                    <p className="text-sm text-slate-400">{schedules.get(mobileSelectedDate)!.description}</p>
+                                                    <p className="text-sm text-gray-600 dark:text-slate-400">{schedules.get(mobileSelectedDate)!.description}</p>
                                                 </div>
-                                            ) : <p className="text-slate-400">계획 없음</p>}
+                                            ) : <p className="text-gray-600 dark:text-slate-400">계획 없음</p>}
                                         </div>
                                         {canManage && <button onClick={() => setIsMobileInputVisible(true)} className="w-full py-3 bg-yellow-400 text-slate-900 font-bold rounded-lg">계획 수정</button>}
                                      </div>
