@@ -512,20 +512,22 @@ export const App: React.FC = () => {
         checkAllLoaded();
       });
     
-    const unsubscribeSettings = db.collection('settings').doc('singleton').onSnapshot((docSnap) => {
+    // 개인별 테마 설정 불러오기
+    const unsubscribeUserTheme = user ? db.collection('users').doc(user.uid).collection('preferences').doc('singleton').onSnapshot((docSnap) => {
         if (docSnap.exists) {
-            const settingsData = docSnap.data();
-            if (settingsData?.globalTheme) setTheme(settingsData.globalTheme);
+            const userPrefs = docSnap.data();
+            if (userPrefs?.theme) {
+                setTheme(userPrefs.theme);
+            }
         }
     }, (error) => {
-        console.error("Error fetching settings:", error);
-        addToast({ message: '설정 정보를 불러오는 데 실패했습니다.', type: 'error' });
-    });
+        console.error("Error fetching user theme:", error);
+    }) : () => {};
 
     return () => {
         unsubscribeRequests();
         unsubscribeMasterData();
-        unsubscribeSettings();
+        unsubscribeUserTheme();
         unsubscribeJigs();
         unsubscribeNotifications();
         unsubscribeSampleRequests();
@@ -540,12 +542,14 @@ export const App: React.FC = () => {
 
   const handleSetTheme = useCallback((newTheme: Theme) => {
     setTheme(newTheme);
-    db.collection('settings').doc('singleton').set({ globalTheme: newTheme }, { merge: true })
-      .catch(error => {
-          console.error("Error saving theme setting:", error);
-          addToast({ message: '테마 설정 저장에 실패했습니다.', type: 'error' });
-      });
-  }, [addToast]);
+    if (user) {
+      db.collection('users').doc(user.uid).collection('preferences').doc('singleton').set({ theme: newTheme }, { merge: true })
+        .catch(error => {
+            console.error("Error saving user theme setting:", error);
+            addToast({ message: '테마 설정 저장에 실패했습니다.', type: 'error' });
+        });
+    }
+  }, [addToast, user]);
 
   useEffect(() => {
     const root = window.document.documentElement;
