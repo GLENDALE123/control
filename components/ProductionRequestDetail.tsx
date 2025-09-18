@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ProductionRequest, ProductionRequestStatus, UserProfile, HistoryEntry, ProductionRequestType } from '../types';
 import { PRODUCTION_REQUEST_STATUS_COLORS } from '../constants';
 import CommentsSection from './CommentsSection';
 import ConfirmationModal from './ConfirmationModal';
 import ActionModal from './ActionModal';
+
+declare const html2canvas: any;
 
 interface ProductionRequestDetailProps {
     request: ProductionRequest;
@@ -13,6 +15,7 @@ interface ProductionRequestDetailProps {
     onAddComment: (id: string, text: string) => void;
     onEdit: (request: ProductionRequest) => void;
     onMarkCommentsAsRead: (id: string) => void;
+    addToast: (toast: { message: string; type: 'success' | 'error' | 'info' }) => void;
 }
 
 const DetailItem: React.FC<{ label: string; value: string | number | React.ReactNode }> = ({ label, value }) => (
@@ -53,9 +56,10 @@ const parseLogisticsContent = (content: string) => {
 };
 
 
-const ProductionRequestDetail: React.FC<ProductionRequestDetailProps> = ({ request, currentUserProfile, onStatusUpdate, onDelete, onAddComment, onEdit, onMarkCommentsAsRead }) => {
+const ProductionRequestDetail: React.FC<ProductionRequestDetailProps> = ({ request, currentUserProfile, onStatusUpdate, onDelete, onAddComment, onEdit, onMarkCommentsAsRead, addToast }) => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [actionModalState, setActionModalState] = useState<{ open: boolean; status: ProductionRequestStatus.Hold | ProductionRequestStatus.Rejected | null }>({ open: false, status: null });
+    const detailRef = useRef<HTMLDivElement>(null);
 
     const canManage = currentUserProfile?.role === 'Admin' || currentUserProfile?.role === 'Manager';
 
@@ -86,12 +90,65 @@ const ProductionRequestDetail: React.FC<ProductionRequestDetailProps> = ({ reque
         return titles[actionModalState.status] || '';
     };
 
+    const handleShare = async () => {
+        const elementToCapture = detailRef.current;
+        if (!elementToCapture) {
+            addToast({ message: '공유할 대상을 찾을 수 없습니다.', type: 'error' });
+            return;
+        }
+
+        addToast({ message: '이미지 생성 중...', type: 'info' });
+
+        try {
+            const canvas = await html2canvas(elementToCapture, {
+                useCORS: true,
+                backgroundColor: window.getComputedStyle(elementToCapture).backgroundColor,
+                scale: 2,
+            });
+
+            const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+            
+            if (!blob) {
+                addToast({ message: '이미지 파일 생성에 실패했습니다.', type: 'error' });
+                return;
+            }
+
+            const fileName = `production-request-${request.id}.png`;
+            const file = new File([blob], fileName, { type: 'image/png' });
+            const isDesktop = !/Mobi|Android/i.test(navigator.userAgent);
+
+            if (isDesktop && navigator.clipboard?.write) {
+                await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
+                addToast({ message: '상세 정보 이미지가 클립보드에 복사되었습니다.', type: 'success' });
+            } else if (navigator.share && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: `생산 요청: ${request.productName}`,
+                    text: `T.M.S. 생산 요청 상세 정보 공유`
+                });
+                addToast({ message: '요청 정보가 공유되었습니다.', type: 'success' });
+            } else {
+                 addToast({ message: '공유 기능이 지원되지 않아 이미지를 다운로드합니다.', type: 'info' });
+                 const link = document.createElement('a');
+                 link.download = fileName;
+                 link.href = URL.createObjectURL(blob);
+                 link.click();
+                 URL.revokeObjectURL(link.href);
+            }
+        } catch (err: any) {
+            if (err.name !== 'AbortError') {
+                console.error('Sharing/Copying failed:', err);
+                addToast({ message: '공유 또는 복사에 실패했습니다.', type: 'error' });
+            }
+        }
+    };
+
     if (request.requestType === ProductionRequestType.LogisticsTransfer) {
         const parsedContent = useMemo(() => parseLogisticsContent(request.content), [request.content]);
 
         return (
             <div className="h-full flex flex-col">
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+                <div ref={detailRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-white dark:bg-slate-800">
                     <div className="flex justify-between items-start">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800 dark:text-white">화성공장 -> 군포공장 물류이동 List</h2>
@@ -178,6 +235,7 @@ const ProductionRequestDetail: React.FC<ProductionRequestDetailProps> = ({ reque
                     {canManage && request.status === ProductionRequestStatus.InProgress && (
                         <button onClick={() => onStatusUpdate(request.id, ProductionRequestStatus.Completed, '완료 처리됨')} className="bg-blue-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-600">완료 처리</button>
                     )}
+                    <button onClick={handleShare} className="bg-indigo-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-indigo-600">이미지로 공유</button>
                     {currentUserProfile?.role === 'Admin' && (
                         <button onClick={() => setIsDeleteModalOpen(true)} className="ml-auto bg-transparent text-red-500 px-4 py-2 rounded-lg">삭제</button>
                     )}
@@ -203,7 +261,7 @@ const ProductionRequestDetail: React.FC<ProductionRequestDetailProps> = ({ reque
 
     return (
         <div className="h-full flex flex-col">
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+            <div ref={detailRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-white dark:bg-slate-800">
                 <div className="flex justify-between items-start">
                     <div>
                         <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{request.productName} ({request.partName})</h2>
@@ -263,6 +321,7 @@ const ProductionRequestDetail: React.FC<ProductionRequestDetailProps> = ({ reque
                  {canManage && ![ProductionRequestStatus.Completed, ProductionRequestStatus.Rejected].includes(request.status) && (
                      <button onClick={() => onEdit(request)} className="bg-gray-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-gray-600">수정</button>
                 )}
+                <button onClick={handleShare} className="bg-indigo-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-indigo-600">이미지로 공유</button>
                 {currentUserProfile?.role === 'Admin' && (
                     <button onClick={() => setIsDeleteModalOpen(true)} className="ml-auto bg-transparent text-red-500 px-4 py-2 rounded-lg">삭제</button>
                 )}

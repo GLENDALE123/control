@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 // FIX: Add Order to the import list from types.
 import { JigRequest, Status, Comment, MasterData, Requester, Destination, Approver, Notification, JigMasterItem, UserProfile, UserRole, QualityInspection, HistoryEntry, SampleRequest, SampleStatus, ActiveCenter, PackagingReport, ProductionRequest, ProductionRequestStatus, ProductionRequestType, ProductionSchedule, Order } from './types';
@@ -99,7 +100,8 @@ const ToastContainer: React.FC<{ toasts: Toast[]; onRemove: (id: number) => void
     );
 };
 
-const App: React.FC = () => {
+// FIX: Changed App to a named export to resolve module resolution error in index.tsx.
+export const App: React.FC = () => {
   const [user, setUser] = useState<firebase.User | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -1642,462 +1644,250 @@ const App: React.FC = () => {
     
         try {
             const schedulesToDeleteRefs: firebase.firestore.DocumentReference[] = [];
-            // Firestore 'in' queries are limited to 10 items in some SDK versions/configurations.
-            // Using a safer chunk size of 10 instead of 30 to prevent query failures.
-            const CHUNK_SIZE = 10;
-    
-            for (let i = 0; i < uniqueDates.length; i += CHUNK_SIZE) {
-                const dateChunk = uniqueDates.slice(i, i + CHUNK_SIZE);
-                const query = db.collection('production-schedules').where('planDate', 'in', dateChunk);
-                const snapshot = await query.get();
-                snapshot.docs.forEach(doc => {
-                    schedulesToDeleteRefs.push(doc.ref);
-                });
+            // Firestore 'in' queries are limited to 30 values.
+            const dateChunks: string[][] = [];
+            for (let i = 0; i < uniqueDates.length; i += 30) {
+                dateChunks.push(uniqueDates.slice(i, i + 30));
             }
-    
-            await db.runTransaction(async (transaction) => {
-                schedulesToDeleteRefs.forEach(ref => {
-                    transaction.delete(ref);
-                });
-    
-                newSchedulesData.forEach((scheduleItem, index) => {
-                    const newDocRef = db.collection('production-schedules').doc();
-                    const now = new Date().toISOString();
-                    const newSchedule: Omit<ProductionSchedule, 'id'> = {
-                        ...scheduleItem,
-                        createdAt: now,
-                        updatedAt: now,
-                        orderIndex: index,
-                    };
-                    transaction.set(newDocRef, newSchedule);
-                });
+
+            for (const chunk of dateChunks) {
+                const querySnapshot = await db.collection('production-schedules').where('planDate', 'in', chunk).get();
+                querySnapshot.forEach(doc => schedulesToDeleteRefs.push(doc.ref));
+            }
+            
+            const batch = db.batch();
+
+            schedulesToDeleteRefs.forEach(ref => batch.delete(ref));
+
+            newSchedulesData.forEach((schedule, index) => {
+                const newSchedulePayload: Omit<ProductionSchedule, 'id'> = {
+                    ...schedule,
+                    orderIndex: index,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                };
+                const newDocRef = db.collection('production-schedules').doc();
+                batch.set(newDocRef, newSchedulePayload);
             });
-    
+            
+            await batch.commit();
             addToast({ message: '생산 일정이 성공적으로 업데이트되었습니다.', type: 'success' });
         } catch (error) {
             console.error("Error saving production schedules:", error);
-            addToast({ message: '일정 업데이트에 실패했습니다.', type: 'error' });
-            throw error;
+            addToast({ message: '생산 일정 업데이트에 실패했습니다.', type: 'error' });
         }
     }, [addToast, currentUserProfile]);
 
     const handleDeleteProductionSchedule = useCallback(async (scheduleId: string) => {
         if (!currentUserProfile || currentUserProfile.role === 'Member') {
-            addToast({ message: '일정을 삭제할 권한이 없습니다.', type: 'error' });
+            addToast({ message: '삭제 권한이 없습니다.', type: 'error' });
             return;
         }
-        addToast({ message: '생산 일정을 삭제하는 중...', type: 'info' });
         try {
             await db.collection('production-schedules').doc(scheduleId).delete();
-            addToast({ message: '생산 일정이 성공적으로 삭제되었습니다.', type: 'success' });
+            addToast({ message: '일정이 삭제되었습니다.', type: 'success' });
         } catch (error) {
-            console.error("Error deleting production schedule:", error);
+            console.error('Error deleting schedule:', error);
             addToast({ message: '일정 삭제에 실패했습니다.', type: 'error' });
-            throw error;
         }
     }, [addToast, currentUserProfile]);
 
     const handleDeleteProductionSchedulesByDate = useCallback(async (date: string) => {
         if (!currentUserProfile || currentUserProfile.role === 'Member') {
-            addToast({ message: '일정을 삭제할 권한이 없습니다.', type: 'error' });
+            addToast({ message: '삭제 권한이 없습니다.', type: 'error' });
             return;
         }
-        addToast({ message: `${date}의 생산 일정을 삭제하는 중...`, type: 'info' });
-
+        addToast({ message: `${date}의 일정을 삭제하는 중...`, type: 'info' });
         try {
             const querySnapshot = await db.collection('production-schedules').where('planDate', '==', date).get();
             if (querySnapshot.empty) {
                 addToast({ message: '삭제할 일정이 없습니다.', type: 'info' });
                 return;
             }
-
             const batch = db.batch();
-            querySnapshot.docs.forEach(doc => {
-                batch.delete(doc.ref);
-            });
+            querySnapshot.docs.forEach(doc => batch.delete(doc.ref));
             await batch.commit();
-
-            addToast({ message: `${date}의 생산 일정이 성공적으로 삭제되었습니다.`, type: 'success' });
+            addToast({ message: `${date}의 일정이 삭제되었습니다.`, type: 'success' });
         } catch (error) {
-            console.error("Error deleting production schedules by date:", error);
+            console.error('Error deleting schedules by date:', error);
             addToast({ message: '일정 삭제에 실패했습니다.', type: 'error' });
-            throw error;
         }
     }, [addToast, currentUserProfile]);
 
-    // FIX: Add handler functions for saving and deleting orders.
     const handleSaveOrders = useCallback(async (newOrdersData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>[]) => {
         if (!currentUserProfile || currentUserProfile.role === 'Member') {
             addToast({ message: '수주를 저장할 권한이 없습니다.', type: 'error' });
             return;
         }
-        addToast({ message: '수주 정보를 업데이트하는 중...', type: 'info' });
-    
-        const uniqueDates = [...new Set(newOrdersData.map(s => s.orderDate))];
+        addToast({ message: '수주 목록을 업데이트하는 중...', type: 'info' });
+
+        const uniqueDates = [...new Set(newOrdersData.map(o => o.orderDate))];
         if (uniqueDates.length === 0) {
             addToast({ message: '저장할 데이터가 없습니다.', type: 'info' });
             return;
         }
-    
+
         try {
-            // Step 1: Find all documents to delete
             const ordersToDeleteRefs: firebase.firestore.DocumentReference[] = [];
-            const DATE_CHUNK_SIZE = 10; // Firestore 'in' query limit
-    
-            for (let i = 0; i < uniqueDates.length; i += DATE_CHUNK_SIZE) {
-                const dateChunk = uniqueDates.slice(i, i + DATE_CHUNK_SIZE);
-                if (dateChunk.length > 0) {
-                    const query = db.collection('orders').where('orderDate', 'in', dateChunk);
-                    const snapshot = await query.get();
-                    snapshot.docs.forEach(doc => {
-                        ordersToDeleteRefs.push(doc.ref);
-                    });
-                }
+            // Firestore 'in' queries are limited to 30 values.
+            const dateChunks: string[][] = [];
+            for (let i = 0; i < uniqueDates.length; i += 30) {
+                dateChunks.push(uniqueDates.slice(i, i + 30));
+            }
+
+            for (const chunk of dateChunks) {
+                const querySnapshot = await db.collection('orders').where('orderDate', 'in', chunk).get();
+                querySnapshot.forEach(doc => ordersToDeleteRefs.push(doc.ref));
             }
             
-            const BATCH_SIZE = 499;
-    
-            // Step 2: Delete old documents in batches
-            for (let i = 0; i < ordersToDeleteRefs.length; i += BATCH_SIZE) {
-                const batch = db.batch();
-                const chunk = ordersToDeleteRefs.slice(i, i + BATCH_SIZE);
-                chunk.forEach(ref => batch.delete(ref));
-                await batch.commit();
-            }
-            if(ordersToDeleteRefs.length > 0) {
-                 addToast({ message: `기존 데이터 ${ordersToDeleteRefs.length}건 삭제 완료.`, type: 'info' });
-            }
-    
-            // Step 3: Add new documents in batches
-            for (let i = 0; i < newOrdersData.length; i += BATCH_SIZE) {
-                const batch = db.batch();
-                const chunk = newOrdersData.slice(i, i + BATCH_SIZE);
-                chunk.forEach((orderItem) => {
-                    const newDocRef = db.collection('orders').doc();
-                    const now = new Date().toISOString();
-                    const newOrder: Omit<Order, 'id'> = {
-                        ...orderItem,
-                        createdAt: now,
-                        updatedAt: now,
-                    };
-                    batch.set(newDocRef, newOrder);
-                });
-                await batch.commit();
-                 addToast({ message: `데이터 저장 중... (${Math.min(i + BATCH_SIZE, newOrdersData.length)}/${newOrdersData.length})`, type: 'info' });
-            }
-    
-            addToast({ message: '수주 정보가 성공적으로 업데이트되었습니다.', type: 'success' });
+            const batch = db.batch();
+
+            ordersToDeleteRefs.forEach(ref => batch.delete(ref));
+            
+            newOrdersData.forEach((order, index) => {
+                const newOrderPayload: Omit<Order, 'id'> = {
+                    ...order,
+                    orderIndex: index,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                };
+                const newDocRef = db.collection('orders').doc();
+                batch.set(newDocRef, newOrderPayload);
+            });
+
+            await batch.commit();
+            addToast({ message: '수주 목록이 성공적으로 업데이트되었습니다.', type: 'success' });
         } catch (error) {
-            console.error("Error saving orders:", error);
-            addToast({ message: '수주 정보 업데이트에 실패했습니다.', type: 'error' });
-            throw error;
+            console.error('Error saving orders:', error);
+            addToast({ message: '수주 목록 업데이트에 실패했습니다.', type: 'error' });
         }
     }, [addToast, currentUserProfile]);
 
-  const renderJigContent = () => {
-    switch (activeMenu) {
-      case 'dashboard':
-        return <Dashboard 
-                  requests={requests}
-                  notifications={notifications.filter(n => n.type === 'jig')}
-                  onNotificationClick={handleNotificationClick}
-                  onSelectRequest={handleSelectRequest}
-                />;
-      case 'ledger':
-        return <ManagementLedger 
-                  requests={requests} 
-                  onSelectRequest={handleSelectRequest} 
-                  theme={theme} 
-                  masterData={masterData}
-                  onShowNewRequestForm={handleShowNewRequestForm}
-                />;
-      case 'jigList':
-        return <JigMasterList theme={theme} addToast={addToast} autocompleteRequests={requests} jigs={jigs} onSelectJig={handleSelectJigMasterItem} onAddNewJig={handleOpenJigRegistrationForm} currentUserProfile={currentUserProfile} />;
-      case 'master':
-        return <MasterDataManagement theme={theme} masterData={masterData} onAddMasterData={handleAddMasterData} onEditMasterDataItem={handleEditMasterDataItem} onDeleteMasterDataItem={onDeleteMasterDataItem} currentUserProfile={currentUserProfile} />;
-      default:
-        return <div className="text-center p-8">선택된 메뉴가 없습니다.</div>;
-    }
-  };
-  
-  const getModalTitle = () => {
-    switch (modal.view) {
-        case 'requestForm': return modal.data ? '요청 수정' : '신규 요청 작성';
-        case 'form': return modal.data ? '샘플 요청 수정' : '신규 샘플 요청';
-        case 'productionRequestForm': return modal.data ? '요청서 수정' : '요청서 등록';
-        case 'productionRequestDetail': return '생산 요청 상세 정보';
-        case 'requestDetail': return '요청 상세 정보';
-        case 'detail': return '샘플 요청 상세';
-        case 'jigForm': return '신규 지그 등록';
-        case 'jigDetail': return '지그 상세 정보';
-        default: return '';
-    }
-  };
 
-  const getModalMaxWidth = () => {
-    if (modal.view === 'productionRequestDetail' && (modal.data as ProductionRequest)?.requestType === ProductionRequestType.LogisticsTransfer) {
-        return 'max-w-[96rem]';
-    }
-    return 'max-w-5xl';
-  };
-
-  const autocompleteJigData = useMemo(() => ({
-      itemNames: [...new Set(requests.map(r => r.itemName).filter(Boolean))],
-      partNames: [...new Set(requests.map(r => r.partName).filter(Boolean))],
-      itemNumbers: [...new Set(requests.map(r => r.itemNumber).filter(Boolean))],
-  }), [requests]);
-
-  const handleShowNewSampleRequestForm = useCallback(() => {
-    openModalWithHistory('form');
-  }, [openModalWithHistory]);
-
-  const handleSelectSampleRequest = useCallback((request: SampleRequest) => {
-    openModalWithHistory('detail', request);
-  }, [openModalWithHistory]);
-
-  const handleShowEditSampleRequestForm = useCallback((request: SampleRequest) => {
-    openModalWithHistory('form', request);
-  }, [openModalWithHistory]);
-  
-  if (isAuthLoading || (user && !currentUserProfile)) {
-    return (
-        <div className="bg-slate-100 dark:bg-slate-900 h-screen">
-            <LoadingSpinner />
-        </div>
-    )
-  }
-  
-  if (!user) {
-    return <LoginPage addToast={addToast} />;
-  }
-
-  if (isLoading) {
+  if (isAuthLoading || (user && !currentUserProfile && !isLoading)) {
       return (
-        <div className="bg-slate-100 dark:bg-slate-900 h-screen">
-            <LoadingSpinner />
-        </div>
-    )
+          <div className="flex items-center justify-center h-screen bg-slate-100 dark:bg-slate-900">
+              <LoadingSpinner />
+          </div>
+      );
   }
-  
-  const navItems: { id: ActiveCenter, label: string }[] = [
-      { id: 'management', label: '종합관리센터' },
-      { id: 'notification', label: '알림 센터' },
-      { id: 'work', label: '생산센터' },
-      { id: 'sample', label: '샘플 센터' },
-      { id: 'quality', label: '품질 관리' },
-      { id: 'jig', label: '지그 관리' },
-      { id: 'calculator', label: '배합 계산기' },
-      { id: 'settings', label: '통합 설정' },
-      { id: 'guide', label: '앱 가이드' },
-  ];
+
+  if (!user) {
+      return <LoginPage addToast={addToast} />;
+  }
+
+  const renderJigContent = () => {
+    switch(activeMenu) {
+        case 'dashboard':
+            return <Dashboard requests={requests} notifications={notifications} onNotificationClick={handleNotificationClick} onSelectRequest={handleSelectRequest} />;
+        case 'ledger':
+            return <ManagementLedger requests={requests} onSelectRequest={handleSelectRequest} theme={theme} masterData={masterData} onShowNewRequestForm={handleShowNewRequestForm} />;
+        case 'jigList':
+            return <JigMasterList theme={theme} addToast={addToast} jigs={jigs} autocompleteRequests={requests} onSelectJig={handleSelectJigMasterItem} onAddNewJig={handleOpenJigRegistrationForm} currentUserProfile={currentUserProfile} />;
+        case 'master':
+            return <MasterDataManagement theme={theme} masterData={masterData} onAddMasterData={handleAddMasterData} onEditMasterDataItem={handleEditMasterDataItem} onDeleteMasterDataItem={onDeleteMasterDataItem} currentUserProfile={currentUserProfile} />;
+        default:
+            return <Dashboard requests={requests} notifications={notifications} onNotificationClick={handleNotificationClick} onSelectRequest={handleSelectRequest} />;
+    }
+  }
 
   const renderActiveCenter = () => {
-    switch(activeCenter) {
-      case 'home':
-        return <HomeScreen
-            onSelectCenter={handleSelectCenter}
-            onSearchSubmit={handleSearchSubmit}
-            notifications={notifications}
-            onNotificationClick={handleNotificationClick}
-        />;
-      case 'management':
-        return <main className="flex-1 overflow-auto p-2 sm:p-4"><ManagementCenter qualityInspections={qualityInspections} sampleRequests={sampleRequests} packagingReports={packagingReports} addToast={addToast} /></main>;
-      case 'jig':
-        return (
-            <>
-                <Navigation
-                  activeMenu={activeMenu}
-                  onSelect={setActiveMenu}
-                  currentUserProfile={currentUserProfile}
-                />
-                <main className="flex-1 overflow-auto p-2 sm:p-4 flex flex-col">
-                    <div className="flex-1 overflow-hidden">
-                        {renderJigContent()}
-                    </div>
-                </main>
-            </>
-        );
-      case 'quality':
-        return <QualityControlCenter 
-                theme={theme}
-                setTheme={handleSetTheme}
-                currentUserProfile={currentUserProfile}
-                addToast={addToast}
-                deepLinkOrderNumber={qualityDeepLink}
-                onDeepLinkHandled={() => setQualityDeepLink(null)}
-                onUpdateInspection={handleUpdateQualityInspection}
-                onDeleteInspectionGroup={handleDeleteInspectionGroup}
-                onAddComment={handleAddQualityComment}
-            />;
-      case 'calculator':
-        return <main className="flex-1 overflow-auto p-2 sm:p-4"><FormulationCalculator /></main>;
-      case 'notification':
-        return <main className="flex-1 overflow-auto p-2 sm:p-4"><NotificationCenter notifications={notifications} onNotificationClick={handleNotificationClick} addToast={addToast} currentUserProfile={currentUserProfile} /></main>;
-      case 'work':
-        // FIX: Pass orders state and handlers to WorkPerformanceCenter.
-        return <main className="flex-1 overflow-auto p-2 sm:p-4"><WorkPerformanceCenter addToast={addToast} currentUserProfile={currentUserProfile} productionRequests={productionRequests} onOpenNewProductionRequest={handleOpenNewProductionRequest} onSelectProductionRequest={handleSelectProductionRequest} productionSchedules={productionSchedules} onSaveProductionSchedules={handleSaveProductionSchedules} onDeleteProductionSchedule={handleDeleteProductionSchedule} onDeleteProductionSchedulesByDate={handleDeleteProductionSchedulesByDate} orders={orders} onSaveOrders={handleSaveOrders} /></main>;
-      case 'sample':
-        return <main className="flex-1 overflow-auto p-2 sm:p-4"><SampleCenter addToast={addToast} currentUserProfile={currentUserProfile} sampleRequests={sampleRequests} onOpenNewRequest={handleShowNewSampleRequestForm} onSelectRequest={handleSelectSampleRequest} /></main>;
-      case 'settings':
-        return <main className="flex-1 overflow-auto p-2 sm:p-4"><Settings theme={theme} setTheme={handleSetTheme} currentUserProfile={currentUserProfile} /></main>;
-      case 'guide':
-        return <main className="flex-1 overflow-auto p-2 sm:p-4"><AppGuide onClose={() => handleSelectCenter('home')} /></main>;
+      if (searchQuery) {
+          return <IntegratedSearchResults 
+              query={searchQuery}
+              onClearSearch={() => setSearchQuery(null)}
+              jigRequests={requests}
+              sampleRequests={sampleRequests}
+              inspections={qualityInspections}
+              jigs={jigs}
+              onSelectJigRequest={handleSelectRequest}
+              onSelectSampleRequest={(req) => { selectCenterWithHistory('sample'); openModalWithHistory('detail', req); }}
+              onSelectJigMaster={handleSelectJigMasterItem}
+          />
+      }
+      switch(activeCenter) {
+          case 'home':
+              return <HomeScreen onSelectCenter={handleSelectCenter} onSearchSubmit={handleSearchSubmit} notifications={notifications} onNotificationClick={handleNotificationClick} />;
+          case 'jig':
+              return <div className="p-2 sm:p-4 h-full flex flex-col"><Navigation activeMenu={activeMenu} onSelect={setActiveMenu} currentUserProfile={currentUserProfile} /><div className="mt-4 flex-1 overflow-hidden">{renderJigContent()}</div></div>;
+          case 'quality':
+              return <QualityControlCenter theme={theme} setTheme={handleSetTheme} currentUserProfile={currentUserProfile} addToast={addToast} deepLinkOrderNumber={qualityDeepLink} onDeepLinkHandled={() => setQualityDeepLink(null)} onUpdateInspection={handleUpdateQualityInspection} onDeleteInspectionGroup={handleDeleteInspectionGroup} onAddComment={handleAddQualityComment}/>;
+          case 'work':
+              return <div className="p-2 sm:p-4 h-full"><WorkPerformanceCenter addToast={addToast} currentUserProfile={currentUserProfile} productionRequests={productionRequests} onOpenNewProductionRequest={handleOpenNewProductionRequest} onSelectProductionRequest={handleSelectProductionRequest} productionSchedules={productionSchedules} onSaveProductionSchedules={handleSaveProductionSchedules} onDeleteProductionSchedule={handleDeleteProductionSchedule} onDeleteProductionSchedulesByDate={handleDeleteProductionSchedulesByDate} orders={orders} onSaveOrders={handleSaveOrders} /></div>;
+          case 'sample':
+              return <div className="p-2 sm:p-4 h-full"><SampleCenter addToast={addToast} currentUserProfile={currentUserProfile} sampleRequests={sampleRequests} onOpenNewRequest={() => openModalWithHistory('form')} onSelectRequest={(req) => openModalWithHistory('detail', req)} /></div>;
+          case 'notification':
+              return <div className="p-2 sm:p-4 h-full"><NotificationCenter notifications={notifications} onNotificationClick={handleNotificationClick} addToast={addToast} currentUserProfile={currentUserProfile} /></div>;
+          case 'calculator':
+              return <div className="p-2 sm:p-4 h-full"><FormulationCalculator /></div>;
+          case 'management':
+              return <div className="p-2 sm:p-4 h-full"><ManagementCenter qualityInspections={qualityInspections} sampleRequests={sampleRequests} packagingReports={packagingReports} addToast={addToast}/></div>;
+          case 'settings':
+              return <div className="p-2 sm:p-4 h-full"><Settings theme={theme} setTheme={handleSetTheme} currentUserProfile={currentUserProfile} /></div>;
+          case 'guide':
+              return <div className="p-2 sm:p-4 h-full"><AppGuide onClose={() => selectCenterWithHistory('home')} /></div>;
+          default:
+              return <HomeScreen onSelectCenter={handleSelectCenter} onSearchSubmit={handleSearchSubmit} notifications={notifications} onNotificationClick={handleNotificationClick} />;
+      }
+  };
+
+  const getModalTitle = () => {
+      switch(modal.view) {
+          case 'requestDetail': return `지그 요청 상세 (ID: ${modal.data?.id})`;
+          case 'requestForm': return modal.data ? '지그 요청 수정' : '신규 지그 요청';
+          case 'jigDetail': return '지그 마스터 상세';
+          case 'jigForm': return '신규 지그 등록';
+          case 'detail': return `샘플 요청 상세 (ID: ${modal.data?.id})`;
+          case 'form': return modal.data ? '샘플 요청 수정' : '신규 샘플 요청';
+          case 'productionRequestForm': return modal.data ? '생산 요청 수정' : '신규 생산 요청';
+          case 'productionRequestDetail': return `생산 요청 상세 (ID: ${modal.data?.id})`;
+          default: return '정보';
+      }
+  }
+
+  const renderModalContent = () => {
+    switch (modal.view) {
+      case 'requestDetail':
+        return <RequestDetail request={modal.data} onStatusUpdate={handleStatusUpdate} onEdit={handleShowEditRequestForm} onDelete={handleDeleteRequest} onReceiveItems={handleReceiveItems} onAddComment={handleAddComment} addToast={addToast} currentUserProfile={currentUserProfile} />;
+      case 'requestForm':
+        return <RequestForm onSave={handleSaveRequest} onCancel={handleCloseModal} existingRequest={modal.data} masterData={masterData} />;
+      case 'jigDetail':
+        return <JigMasterDetail jig={modal.data} onSave={handleUpdateJigMasterItem} onDelete={handleDeleteJigMasterItem} currentUserProfile={currentUserProfile} addToast={addToast} />;
+      case 'jigForm':
+        return <JigRegistrationForm isOpen={true} onSave={handleSaveJigMasterItem} onClose={handleCloseModal} autocompleteData={{ itemNames: [...new Set(jigs.map(j => j.itemName))], partNames: [...new Set(jigs.map(j => j.partName))], itemNumbers: [...new Set(jigs.map(j => j.itemNumber))] }} />;
+      case 'detail': // Sample Request Detail
+        return <SampleRequestDetail request={modal.data} currentUserProfile={currentUserProfile} onUpdateStatus={handleUpdateSampleRequestStatus} onDelete={handleDeleteSampleRequest} onAddComment={handleAddSampleComment} onUploadImage={handleUploadSampleImage} addToast={addToast} onEdit={(req) => openModalWithHistory('form', req)} onUpdateWorkData={handleUpdateSampleWorkData} />;
+      case 'form': // Sample Request Form
+        return <SampleRequestForm onSave={handleSaveSampleRequest} onCancel={handleCloseModal} existingRequest={modal.data} addToast={addToast} />;
+      case 'productionRequestForm':
+        return <ProductionRequestForm onSave={handleSaveProductionRequest} onCancel={handleCloseModal} currentUserProfile={currentUserProfile} existingRequest={modal.data} />;
+      case 'productionRequestDetail':
+        return <ProductionRequestDetail request={modal.data} currentUserProfile={currentUserProfile} onStatusUpdate={handleUpdateProductionRequestStatus} onDelete={handleDeleteProductionRequest} onAddComment={handleAddProductionRequestComment} onEdit={handleShowEditProductionRequestForm} onMarkCommentsAsRead={handleMarkProductionRequestCommentsAsRead} addToast={addToast}/>;
       default:
         return null;
     }
   };
 
   return (
-    <div className={`flex flex-col h-full font-sans bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200`}>
-        <ToastContainer toasts={toasts} onRemove={removeToast} />
-        
-        {activeCenter !== 'home' && searchQuery === null && (
-            <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-30 shadow-sm flex-shrink-0 pt-2">
-                <div className="w-full px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
-                        <div className="flex items-center space-x-4">
-                            <button onClick={() => handleSelectCenter('home')} className="flex items-center space-x-2 group">
-                                <AppIcon className="w-8 h-8 transition-transform group-hover:scale-110" />
-                                <span className="text-lg font-bold text-gray-800 dark:text-white hidden sm:inline">T.M.S</span>
-                            </button>
-                            <div className="hidden md:flex items-center space-x-2 overflow-x-auto scrollbar-hide">
-                                {navItems.map(item => (
-                                    <button key={item.id} onClick={() => handleSelectCenter(item.id)} className={`relative px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${activeCenter === item.id ? 'text-primary-600 dark:text-primary-400' : 'text-slate-500 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white'}`}>
-                                        {item.label}
-                                        {unreadCountsByCenter[item.id] > 0 && (
-                                            <span className="absolute top-1 right-1 block w-2 h-2 bg-red-500 rounded-full"></span>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-x-4">
-                            <div className="relative">
-                                <button
-                                    ref={notificationButtonRef}
-                                    onClick={() => setIsNotificationPanelOpen(prev => !prev)}
-                                    className="relative p-2 rounded-full text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-                                    aria-label="알림"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                                    </svg>
-                                    {unreadCount > 0 && (
-                                        <span className="absolute top-1.5 right-1.5 block w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white dark:ring-slate-900/80"></span>
-                                    )}
-                                </button>
-                                {isNotificationPanelOpen && (
-                                    <NotificationPanel
-                                        ref={notificationPanelRef}
-                                        notifications={notifications}
-                                        onNotificationClick={handleNotificationClickFromPanel}
-                                        onMarkAllAsRead={markAllNotificationsAsRead}
-                                        onClose={() => setIsNotificationPanelOpen(false)}
-                                        onViewAll={() => {
-                                            handleSelectCenter('notification');
-                                            setIsNotificationPanelOpen(false);
-                                        }}
-                                    />
-                                )}
-                             </div>
-                             <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full bg-primary-200 dark:bg-primary-700 flex items-center justify-center font-bold text-primary-700 dark:text-primary-200 text-sm">
-                                    {currentUserProfile?.displayName.charAt(0)}
-                                </div>
-                                <span className="text-sm font-semibold hidden sm:inline">{currentUserProfile?.displayName}</span>
-                            </div>
-                            <button onClick={handleLogout} title="로그아웃" className="p-2 rounded-full text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </header>
-        )}
-
-        <div className="flex-1 flex flex-col overflow-hidden">
-             {searchQuery !== null ? (
-                <IntegratedSearchResults
-                    query={searchQuery}
-                    onClearSearch={() => setSearchQuery(null)}
-                    jigRequests={requests}
-                    sampleRequests={sampleRequests}
-                    inspections={qualityInspections}
-                    jigs={jigs}
-                    onSelectJigRequest={handleSelectRequest}
-                    onSelectSampleRequest={handleSelectSampleRequest}
-                    onSelectJigMaster={handleSelectJigMasterItem}
-                />
-            ) : (
-                renderActiveCenter()
-            )}
+    <>
+      {isLoading && (
+        <div className="fixed inset-0 bg-white dark:bg-slate-900 z-[200] flex items-center justify-center">
+            <LoadingSpinner />
         </div>
-                
-        <FullScreenModal
-            isOpen={modal.view !== null}
-            onClose={handleCloseModal}
-            title={getModalTitle()}
-            maxWidth={getModalMaxWidth()}
-        >
-            {modal.view === 'requestForm' && (
-                <RequestForm onSave={handleSaveRequest} onCancel={handleCloseModal} existingRequest={modal.data} masterData={masterData} />
-            )}
-            {modal.view === 'form' && (
-                <SampleRequestForm onSave={handleSaveSampleRequest} onCancel={handleCloseModal} existingRequest={modal.data} addToast={addToast} />
-            )}
-            {modal.view === 'productionRequestForm' && (
-                <ProductionRequestForm onSave={handleSaveProductionRequest} onCancel={handleCloseModal} currentUserProfile={currentUserProfile} existingRequest={modal.data} />
-            )}
-            {modal.view === 'productionRequestDetail' && modal.data && (
-                <ProductionRequestDetail
-                    request={modal.data}
-                    currentUserProfile={currentUserProfile}
-                    onStatusUpdate={handleUpdateProductionRequestStatus}
-                    onAddComment={handleAddProductionRequestComment}
-                    onDelete={handleDeleteProductionRequest}
-                    onEdit={handleShowEditProductionRequestForm}
-                    onMarkCommentsAsRead={handleMarkProductionRequestCommentsAsRead}
-                />
-            )}
-            {modal.view === 'requestDetail' && modal.data && ['jig'].includes(modal.data?.type || 'jig') && (
-                <RequestDetail request={modal.data} onStatusUpdate={handleStatusUpdate} onEdit={handleShowEditRequestForm} onDelete={handleDeleteRequest} onReceiveItems={handleReceiveItems} onAddComment={handleAddComment} addToast={addToast} currentUserProfile={currentUserProfile} />
-            )}
-             {modal.view === 'detail' && modal.data && Object.values(SampleStatus).includes((modal.data as any).status) && (
-                <SampleRequestDetail request={modal.data} currentUserProfile={currentUserProfile} onUpdateStatus={handleUpdateSampleRequestStatus} onDelete={handleDeleteSampleRequest} onAddComment={handleAddSampleComment} onUploadImage={handleUploadSampleImage} addToast={addToast} onEdit={handleShowEditSampleRequestForm} onUpdateWorkData={handleUpdateSampleWorkData} />
-            )}
-            {modal.view === 'jigForm' && (
-                <JigRegistrationForm isOpen={true} onClose={handleCloseModal} onSave={handleSaveJigMasterItem} autocompleteData={autocompleteJigData} />
-            )}
-            {modal.view === 'jigDetail' && modal.data && (
-                <JigMasterDetail jig={modal.data} onSave={handleUpdateJigMasterItem} onDelete={handleDeleteJigMasterItem} currentUserProfile={currentUserProfile} addToast={addToast} />
-            )}
-        </FullScreenModal>
-       
-        <style>{`
-            @keyframes fade-in-down {
-              from { opacity: 0; transform: translateY(-10px); }
-              to { opacity: 1; transform: translateY(0); }
-            }
-            .animate-fade-in-down {
-              animation: fade-in-down 0.3s ease-out forwards;
-            }
-            @keyframes fade-in-up {
-              from { opacity: 0; transform: translateY(20px); }
-              to { opacity: 1; transform: translateY(0); }
-            }
-            .animate-fade-in-up {
-              animation: fade-in-up 0.5s ease-out forwards;
-            }
-            @keyframes toast-in {
-              from { opacity: 0; transform: translateY(20px); }
-              to { opacity: 1; transform: translateY(0); }
-            }
-            .animate-toast-in {
-              animation: toast-in 0.3s ease-out forwards;
-            }
-        `}</style>
-    </div>
+      )}
+      <div className="h-full w-full">
+          {renderActiveCenter()}
+      </div>
+
+      <FullScreenModal
+          isOpen={modal.view !== null}
+          onClose={handleCloseModal}
+          title={getModalTitle()}
+      >
+        {renderModalContent()}
+      </FullScreenModal>
+      
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+    </>
   );
 };
-
-export default App;
