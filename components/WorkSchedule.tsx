@@ -189,6 +189,52 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
         }
     };
 
+    // 인쇄: 현재 달력 뷰를 이미지로 캡처하여 새 창에서 인쇄
+    const handlePrint = useCallback(async () => {
+        if (!monthlyCalendarRef.current) {
+            addToast({ message: '달력 요소를 찾을 수 없습니다.', type: 'error' });
+            return;
+        }
+        try {
+            const isDark = document.documentElement.classList.contains('dark');
+            const bgColor = isDark ? '#0f172a' : '#ffffff';
+            const canvas = await html2canvas(monthlyCalendarRef.current, {
+                useCORS: true,
+                backgroundColor: bgColor,
+                scale: 2
+            });
+            const dataUrl = canvas.toDataURL('image/png');
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) return;
+            // 제목/헤더를 최대한 비우기 위해 빈 타이틀 사용
+            printWindow.document.write(`
+                <html>
+                  <head>
+                    <title>​</title>
+                    <style>
+                      @page { size: A4 landscape; margin: 0; }
+                      html, body { margin: 0; padding: 0; height: 100%; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                      .page { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
+                      .page img { max-width: 100%; max-height: 100%; width: auto; height: auto; }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="page">
+                      <img src="${dataUrl}" alt="schedule" />
+                    </div>
+                    <script>
+                      window.onload = function() { window.focus(); window.print(); setTimeout(() => window.close(), 300); }
+                    <\/script>
+                  </body>
+                </html>
+            `);
+            printWindow.document.close();
+        } catch (error) {
+            console.error(error);
+            addToast({ message: '인쇄 준비 중 오류가 발생했습니다.', type: 'error' });
+        }
+    }, [currentDate, view, addToast]);
+
     const handlePostToAnnouncements = async () => {
         if (!monthlyCalendarRef.current) {
             addToast({ message: '달력 요소를 찾을 수 없습니다.', type: 'error' });
@@ -346,6 +392,12 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
                 <div className="flex items-center gap-2">
                     <button onClick={() => setView('year')} className={`px-3 py-1 rounded-md text-sm ${view === 'year' ? 'bg-yellow-400 text-slate-900' : 'bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-slate-200'}`}>연간 보기</button>
                     <button onClick={() => setView('month')} className={`px-3 py-1 rounded-md text-sm ${view === 'month' ? 'bg-yellow-400 text-slate-900' : 'bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-slate-200'}`}>월간 보기</button>
+                    <button onClick={handlePrint} className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                        </svg>
+                        인쇄
+                    </button>
                 </div>
             </div>
             
