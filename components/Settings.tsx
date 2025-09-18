@@ -188,9 +188,12 @@ const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile
                         }
 
                         setNotifPrefs((prev) => ({ ...(prev as any), [key]: next } as any));
-                        const update: any = {};
-                        update[`notificationPrefs.${key}`] = next;
-                        await db.collection('users').doc(user.uid).collection('preferences').doc('singleton').set(update, { merge: true });
+                        
+                        // 전체 notificationPrefs 객체를 업데이트
+                        const currentPrefs = { ...notifPrefs, [key]: next };
+                        await db.collection('users').doc(user.uid).collection('preferences').doc('singleton').set({
+                          notificationPrefs: currentPrefs
+                        }, { merge: true });
                       }}
                       className={`w-12 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 ${isOn ? 'bg-green-500 dark:bg-green-600 focus:ring-green-500' : 'bg-slate-300 dark:bg-slate-700 focus:ring-slate-400 dark:focus:ring-slate-500'}`}
                     >
