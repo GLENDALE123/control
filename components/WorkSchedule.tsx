@@ -320,15 +320,19 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
                 <div 
                     key={dateStr}
                     className={`
-                        ${isYearView ? 'h-8' : `px-2 py-1 border-t border-r border-slate-700 flex flex-col ${isPrintMode ? 'min-h-32' : 'min-h-24'}`}
+                        ${isYearView ? 'h-8' : `px-2 ${schedule ? 'pt-7' : 'pt-5'} pb-1 border-t border-r border-slate-700 flex flex-col relative ${isPrintMode ? 'min-h-32' : 'min-h-24'}`}
                         ${canManage && !isYearView ? 'cursor-pointer hover:bg-slate-700' : ''}
                         ${isSelected ? 'outline outline-2 outline-yellow-400' : ''}
                     `}
                     onClick={() => handleDateClick(dateStr)}
                 >
-                    <span className={`flex items-center justify-center ${isYearView ? 'text-xs' : ''} ${dayOfWeek === 0 || holiday ? 'text-red-400' : ''} ${schedule ? 'bg-yellow-400 text-slate-900 rounded-full w-6 h-6' : ''}`}>
-                        {day}
-                    </span>
+                    <span
+                        className={`
+                            ${isYearView ? 'text-xs' : 'absolute top-1 left-1'}
+                            ${dayOfWeek === 0 || holiday ? 'text-red-400' : ''}
+                            ${schedule ? 'flex items-center justify-center bg-yellow-400 text-slate-900 rounded-full w-6 h-6' : ''}
+                        `}
+                    >{day}</span>
                     {!isYearView && (
                          <div className={`text-xs mt-1 space-y-1 ${isPrintMode ? 'overflow-visible whitespace-pre-wrap break-words' : 'overflow-hidden'}`}>
                              {holiday && <p className={`${isPrintMode ? '' : 'truncate'} text-red-400 font-semibold`}>{holiday}</p>}
