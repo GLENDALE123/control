@@ -70,6 +70,7 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
     const canManage = currentUserProfile?.role === 'Admin';
     const [mobileSelectedDate, setMobileSelectedDate] = useState<string | null>(null);
     const [isMobileInputVisible, setIsMobileInputVisible] = useState(false);
+    const [isPrintMode, setIsPrintMode] = useState(false);
 
     useEffect(() => {
         const year = currentDate.getFullYear();
@@ -196,14 +197,18 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
             return;
         }
         try {
+            // 프린트 전용 레이아웃 적용 (텍스트 잘림 방지)
+            setIsPrintMode(true);
+            await new Promise(resolve => setTimeout(resolve, 50));
             const isDark = document.documentElement.classList.contains('dark');
             const bgColor = isDark ? '#0f172a' : '#ffffff';
             const canvas = await html2canvas(monthlyCalendarRef.current, {
                 useCORS: true,
                 backgroundColor: bgColor,
-                scale: 2
+                scale: 3
             });
             const dataUrl = canvas.toDataURL('image/png');
+            setIsPrintMode(false);
             const printWindow = window.open('', '_blank');
             if (!printWindow) return;
             // 제목/헤더를 최대한 비우기 위해 빈 타이틀 사용
@@ -212,10 +217,10 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
                   <head>
                     <title>​</title>
                     <style>
-                      @page { size: A4 landscape; margin: 0; }
+                      @page { size: A4 landscape; margin: 10mm; }
                       html, body { margin: 0; padding: 0; height: 100%; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                      .page { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
-                      .page img { max-width: 100%; max-height: 100%; width: auto; height: auto; }
+                      .page { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+                      .page img { display:block; max-width: 100%; max-height: 100%; width: auto; height: auto; page-break-inside: avoid; image-rendering: -webkit-optimize-contrast; }
                     </style>
                   </head>
                   <body>
@@ -232,6 +237,7 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
         } catch (error) {
             console.error(error);
             addToast({ message: '인쇄 준비 중 오류가 발생했습니다.', type: 'error' });
+            setIsPrintMode(false);
         }
     }, [currentDate, view, addToast]);
 
@@ -323,12 +329,12 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
                         {day}
                     </span>
                     {!isYearView && (
-                         <div className="text-xs mt-1 space-y-1 overflow-hidden">
+                         <div className={`text-xs mt-1 space-y-1 ${isPrintMode ? 'overflow-visible whitespace-pre-wrap break-words' : 'overflow-hidden'}`}>
                             {holiday && <p className="text-red-400 truncate font-semibold">{holiday}</p>}
                             {schedule && (
                                 <>
-                                    <p className="font-semibold truncate" style={{ color: WORK_TYPES[schedule.type as keyof typeof WORK_TYPES]?.color }}>• {schedule.type}</p>
-                                    <p className="truncate text-slate-400">{schedule.description}</p>
+                                    <p className={`${isPrintMode ? '' : 'truncate'} font-semibold`} style={{ color: WORK_TYPES[schedule.type as keyof typeof WORK_TYPES]?.color }}>• {schedule.type}</p>
+                                    <p className={`${isPrintMode ? '' : 'truncate'} text-slate-400`}>{schedule.description}</p>
                                 </>
                             )}
                         </div>
