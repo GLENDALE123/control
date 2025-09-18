@@ -14,6 +14,24 @@ function isSupported(): boolean {
 // FCM 초기화 상태를 추적하여 중복 초기화 방지
 let isFCMInitialized = false;
 
+// Stable client identifier to distinguish browser/PWA instances on the same device
+function getClientId(): string {
+  try {
+    const key = 'fcmClientId';
+    let id = localStorage.getItem(key);
+    if (!id) {
+      // Prefer crypto.randomUUID when available
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now();
+      localStorage.setItem(key, id);
+    }
+    return id;
+  } catch {
+    return 'unknown-client';
+  }
+}
+
 export async function initFCM(): Promise<FcmInitResult> {
   if (!isSupported()) return { token: null, permission: 'denied' };
   if (isFCMInitialized) return { token: null, permission: Notification.permission };
@@ -29,7 +47,10 @@ export async function initFCM(): Promise<FcmInitResult> {
     if (!messaging) return { token: null, permission };
 
     const token = await messaging.getToken({ vapidKey: VAPID_PUBLIC_KEY, serviceWorkerRegistration: registration as ServiceWorkerRegistration });
-    if (token) await saveToken(token, permission);
+    if (token) {
+      await migrateExistingTokens();
+      await saveToken(token, permission);
+    }
 
     const anyMessaging: any = messaging as any;
     if (anyMessaging && typeof anyMessaging.onTokenRefresh === 'function') {
@@ -74,9 +95,87 @@ async function saveToken(token: string, permission: NotificationPermission) {
   if (!uid) return;
   const userAgent = navigator.userAgent;
   const language = navigator.language;
-  const ref = db.collection('users').doc(uid).collection('fcmTokens').doc(token);
-  await ref.set({ token, platform: 'web', permission, userAgent, language, enabled: true, updatedAt: firebase.firestore.FieldValue.serverTimestamp(), createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  const clientId = getClientId();
+  const tokensCol = db.collection('users').doc(uid).collection('fcmTokens');
+  const ref = tokensCol.doc(token);
+  await ref.set({ token, platform: 'web', clientId, permission, userAgent, language, enabled: true, updatedAt: firebase.firestore.FieldValue.serverTimestamp(), createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+
+  // Disable older tokens for the same client to prevent duplicate notifications on the same device/app instance
+  try {
+    const snapshot = await tokensCol.where('platform', '==', 'web').where('clientId', '==', clientId).get();
+    snapshot.forEach((doc) => {
+      if (doc.id !== token) {
+        doc.ref.set({ enabled: false, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      }
+    });
+  } catch (e) {
+    // best-effort cleanup
+  }
   try { localStorage.setItem('fcmToken', token); } catch {}
+}
+
+// Migrate existing tokens to add clientId and disable duplicates
+async function migrateExistingTokens(): Promise<void> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  
+  try {
+    const tokensCol = db.collection('users').doc(uid).collection('fcmTokens');
+    const snapshot = await tokensCol.where('platform', '==', 'web').where('enabled', '==', true).get();
+    
+    if (snapshot.empty) return;
+    
+    const clientId = getClientId();
+    const batch = db.batch();
+    let hasUpdates = false;
+    
+    // Group tokens by userAgent (same device/browser type)
+    const tokensByAgent: { [key: string]: any[] } = {};
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      const agent = data.userAgent || 'unknown';
+      if (!tokensByAgent[agent]) tokensByAgent[agent] = [];
+      tokensByAgent[agent].push({ doc, data });
+    });
+    
+    // For each userAgent group, keep only the latest token and disable others
+    Object.entries(tokensByAgent).forEach(([agent, tokens]) => {
+      if (tokens.length <= 1) return;
+      
+      // Sort by updatedAt (newest first)
+      tokens.sort((a, b) => {
+        const aTime = a.data.updatedAt?.toMillis?.() || 0;
+        const bTime = b.data.updatedAt?.toMillis?.() || 0;
+        return bTime - aTime;
+      });
+      
+      // Keep the first (newest) token, disable the rest
+      for (let i = 1; i < tokens.length; i++) {
+        batch.update(tokens[i].doc.ref, { 
+          enabled: false, 
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          disabledReason: 'duplicate-token-cleanup'
+        });
+        hasUpdates = true;
+      }
+      
+      // Add clientId to the kept token if it doesn't have one
+      if (!tokens[0].data.clientId) {
+        batch.update(tokens[0].doc.ref, { 
+          clientId,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        hasUpdates = true;
+      }
+    });
+    
+    if (hasUpdates) {
+      await batch.commit();
+      console.log('FCM token migration completed: disabled duplicate tokens');
+    }
+  } catch (e) {
+    console.error('FCM token migration failed:', e);
+  }
 }
 
 
