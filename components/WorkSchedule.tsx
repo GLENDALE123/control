@@ -319,7 +319,7 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
                 <div 
                     key={dateStr}
                     className={`
-                         ${isYearView ? 'h-8' : 'px-2 py-1 border-t border-r border-slate-700 flex flex-col min-h-24'}
+                        ${isYearView ? 'h-8' : `px-2 py-1 border-t border-r border-slate-700 flex flex-col ${isPrintMode ? 'min-h-32' : 'min-h-24'}`}
                         ${canManage && !isYearView ? 'cursor-pointer hover:bg-slate-700' : ''}
                         ${isSelected ? 'outline outline-2 outline-yellow-400' : ''}
                     `}
