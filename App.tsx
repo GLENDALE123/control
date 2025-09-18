@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 // FIX: Add Order to the import list from types.
 import { JigRequest, Status, Comment, MasterData, Requester, Destination, Approver, Notification, JigMasterItem, UserProfile, UserRole, QualityInspection, HistoryEntry, SampleRequest, SampleStatus, ActiveCenter, PackagingReport, ProductionRequest, ProductionRequestStatus, ProductionRequestType, ProductionSchedule, Order } from './types';
@@ -34,6 +33,7 @@ import ProductionRequestDetail from './components/ProductionRequestDetail';
 import IntegratedSearchResults from './components/IntegratedSearchResults';
 import FormulationCalculator from './components/FormulationCalculator';
 import ManagementCenter from './components/ManagementCenter';
+import MainHeader from './components/MainHeader';
 
 
 import { db, storage, auth } from './firebaseConfig';
@@ -144,6 +144,21 @@ export const App: React.FC = () => {
       removeToast(id);
     }, 3000);
   }, [removeToast]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        notificationPanelRef.current &&
+        !notificationPanelRef.current.contains(event.target as Node) &&
+        notificationButtonRef.current &&
+        !notificationButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsNotificationPanelOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     // This effect handles the Android back button behavior
@@ -1809,23 +1824,23 @@ export const App: React.FC = () => {
           case 'home':
               return <HomeScreen onSelectCenter={handleSelectCenter} onSearchSubmit={handleSearchSubmit} notifications={notifications} onNotificationClick={handleNotificationClick} />;
           case 'jig':
-              return <div className="p-2 sm:p-4 h-full flex flex-col"><Navigation activeMenu={activeMenu} onSelect={setActiveMenu} currentUserProfile={currentUserProfile} /><div className="mt-4 flex-1 overflow-hidden">{renderJigContent()}</div></div>;
+              return <div className="p-2 sm:p-4 flex flex-col"><Navigation activeMenu={activeMenu} onSelect={setActiveMenu} currentUserProfile={currentUserProfile} /><div className="mt-4 flex-1 overflow-hidden">{renderJigContent()}</div></div>;
           case 'quality':
               return <QualityControlCenter theme={theme} setTheme={handleSetTheme} currentUserProfile={currentUserProfile} addToast={addToast} deepLinkOrderNumber={qualityDeepLink} onDeepLinkHandled={() => setQualityDeepLink(null)} onUpdateInspection={handleUpdateQualityInspection} onDeleteInspectionGroup={handleDeleteInspectionGroup} onAddComment={handleAddQualityComment}/>;
           case 'work':
-              return <div className="p-2 sm:p-4 h-full"><WorkPerformanceCenter addToast={addToast} currentUserProfile={currentUserProfile} productionRequests={productionRequests} onOpenNewProductionRequest={handleOpenNewProductionRequest} onSelectProductionRequest={handleSelectProductionRequest} productionSchedules={productionSchedules} onSaveProductionSchedules={handleSaveProductionSchedules} onDeleteProductionSchedule={handleDeleteProductionSchedule} onDeleteProductionSchedulesByDate={handleDeleteProductionSchedulesByDate} orders={orders} onSaveOrders={handleSaveOrders} /></div>;
+              return <div className="p-2 sm:p-4"><WorkPerformanceCenter addToast={addToast} currentUserProfile={currentUserProfile} productionRequests={productionRequests} onOpenNewProductionRequest={handleOpenNewProductionRequest} onSelectProductionRequest={handleSelectProductionRequest} productionSchedules={productionSchedules} onSaveProductionSchedules={handleSaveProductionSchedules} onDeleteProductionSchedule={handleDeleteProductionSchedule} onDeleteProductionSchedulesByDate={handleDeleteProductionSchedulesByDate} orders={orders} onSaveOrders={handleSaveOrders} /></div>;
           case 'sample':
-              return <div className="p-2 sm:p-4 h-full"><SampleCenter addToast={addToast} currentUserProfile={currentUserProfile} sampleRequests={sampleRequests} onOpenNewRequest={() => openModalWithHistory('form')} onSelectRequest={(req) => openModalWithHistory('detail', req)} /></div>;
+              return <div className="p-2 sm:p-4"><SampleCenter addToast={addToast} currentUserProfile={currentUserProfile} sampleRequests={sampleRequests} onOpenNewRequest={() => openModalWithHistory('form')} onSelectRequest={(req) => openModalWithHistory('detail', req)} /></div>;
           case 'notification':
-              return <div className="p-2 sm:p-4 h-full"><NotificationCenter notifications={notifications} onNotificationClick={handleNotificationClick} addToast={addToast} currentUserProfile={currentUserProfile} /></div>;
+              return <div className="p-2 sm:p-4"><NotificationCenter notifications={notifications} onNotificationClick={handleNotificationClick} addToast={addToast} currentUserProfile={currentUserProfile} /></div>;
           case 'calculator':
-              return <div className="p-2 sm:p-4 h-full"><FormulationCalculator /></div>;
+              return <div className="p-2 sm:p-4"><FormulationCalculator /></div>;
           case 'management':
-              return <div className="p-2 sm:p-4 h-full"><ManagementCenter qualityInspections={qualityInspections} sampleRequests={sampleRequests} packagingReports={packagingReports} addToast={addToast}/></div>;
+              return <div className="p-2 sm:p-4"><ManagementCenter qualityInspections={qualityInspections} sampleRequests={sampleRequests} packagingReports={packagingReports} addToast={addToast}/></div>;
           case 'settings':
-              return <div className="p-2 sm:p-4 h-full"><Settings theme={theme} setTheme={handleSetTheme} currentUserProfile={currentUserProfile} /></div>;
+              return <div className="p-2 sm:p-4"><Settings theme={theme} setTheme={handleSetTheme} currentUserProfile={currentUserProfile} /></div>;
           case 'guide':
-              return <div className="p-2 sm:p-4 h-full"><AppGuide onClose={() => selectCenterWithHistory('home')} /></div>;
+              return <div className="p-2 sm:p-4"><AppGuide onClose={() => selectCenterWithHistory('home')} /></div>;
           default:
               return <HomeScreen onSelectCenter={handleSelectCenter} onSearchSubmit={handleSearchSubmit} notifications={notifications} onNotificationClick={handleNotificationClick} />;
       }
@@ -1875,8 +1890,28 @@ export const App: React.FC = () => {
             <LoadingSpinner />
         </div>
       )}
-      <div className="h-full w-full">
-          {renderActiveCenter()}
+      <div className="h-full w-full flex flex-col">
+        {activeCenter !== 'home' && !searchQuery && (
+            <MainHeader
+                activeCenter={activeCenter}
+                onSelectCenter={handleSelectCenter}
+                unreadCounts={unreadCountsByCenter}
+                userProfile={currentUserProfile}
+                onLogout={handleLogout}
+                isNotificationPanelOpen={isNotificationPanelOpen}
+                onToggleNotificationPanel={() => setIsNotificationPanelOpen(prev => !prev)}
+                unreadCount={unreadCount}
+                notificationButtonRef={notificationButtonRef}
+                notifications={notifications}
+                notificationPanelRef={notificationPanelRef}
+                onNotificationClickFromPanel={handleNotificationClickFromPanel}
+                onMarkAllAsRead={markAllNotificationsAsRead}
+                onViewAll={() => { handleSelectCenter('notification'); setIsNotificationPanelOpen(false); }}
+            />
+        )}
+        <div className="flex-1 overflow-y-auto">
+            {renderActiveCenter()}
+        </div>
       </div>
 
       <FullScreenModal
