@@ -194,7 +194,13 @@ const RequestDetail: React.FC<RequestDetailProps> = ({ request, onStatusUpdate, 
                               <img 
                                   key={index} 
                                   src={url} 
-                                  alt={`Request image ${index+1}`} 
+                                  alt=""
+                                  aria-label={`첨부 이미지 ${index + 1}`}
+                                  width={160}
+                                  height={96}
+                                  loading="lazy"
+                                  decoding="async"
+                                  fetchpriority="low"
                                   className="w-full h-24 object-cover rounded-lg cursor-pointer transition-transform hover:scale-105"
                                   onClick={() => openLightbox(url)}
                               />

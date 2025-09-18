@@ -302,7 +302,13 @@ const InspectionDetailsList: React.FC<{ inspection: QualityInspection; onImageCl
                             <img
                                 key={index}
                                 src={url}
-                                alt={`Inspection image ${index + 1}`}
+                                alt=""
+                                aria-label={`첨부 이미지 ${index + 1}`}
+                                width={160}
+                                height={96}
+                                loading="lazy"
+                                decoding="async"
+                                fetchpriority="low"
                                 className="w-full h-24 object-cover rounded-md cursor-pointer transition-transform hover:scale-105"
                                 onClick={() => onImageClick(url)}
                             />
