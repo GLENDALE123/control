@@ -1,5 +1,4 @@
 
-
 import React, { useState, useMemo } from 'react';
 
 interface TeamMember {
@@ -84,15 +83,15 @@ const TeamManagement: React.FC = () => {
         return teamData
             .map(dept => ({
                 ...dept,
-                members: dept.members.filter(member =>
+                members: (dept.members || []).filter(member =>
                     member.name.toLowerCase().includes(lowercasedFilter) ||
                     member.title.toLowerCase().includes(lowercasedFilter)
                 ),
             }))
-            .filter(dept => dept.members.length > 0);
+            .filter(dept => (dept.members?.length || 0) > 0);
     }, [searchTerm]);
     
-    const totalMembers = useMemo(() => teamData.reduce((acc, dept) => acc + dept.members.length, 0), []);
+    const totalMembers = useMemo(() => teamData.reduce((acc, dept) => acc + (dept.members?.length || 0), 0), []);
     const totalDepartments = teamData.length;
 
     return (
