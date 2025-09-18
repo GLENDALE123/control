@@ -1,0 +1,115 @@
+[1mdiff --cc components/Settings.tsx[m
+[1mindex d8295c3,23bf8a7..0000000[m
+[1m--- a/components/Settings.tsx[m
+[1m+++ b/components/Settings.tsx[m
+[36m@@@ -3,6 -3,8 +3,9 @@@[m [mimport ThemeToggle from './ThemeToggle'[m
+  import AppIcon from './AppIcon';[m
+  import { UserProfile, UserRole } from '../types';[m
+  import { db } from '../firebaseConfig';[m
+[31m -import { initFCM } from '../services/fcm';[m
+[32m+ import firebase from 'firebase/compat/app';[m
+[32m++import 'firebase/compat/auth';[m
+[32m++[m
+  [m
+  type Theme = 'light' | 'dark';[m
+  [m
+[36m@@@ -108,6 -110,24 +111,24 @@@[m [mconst UserManagement: React.FC<{ curren[m
+  [m
+  [m
+  const Settings: React.FC<SettingsProps> = ({ theme, setTheme, currentUserProfile }) => {[m
+[32m+   const [notifPrefs, setNotifPrefs] = useState<{ jig: boolean; work: boolean; quality: boolean; sample: boolean }>({ jig: true, work: true, quality: true, sample: true });[m
+[32m+ [m
+[32m+   useEffect(() => {[m
+[32m+     const user = firebase.auth().currentUser;[m
+[32m+     if (!user) return;[m
+[31m -    const prefDocRef = db.collection('users').doc(user.uid).collection('preferences').doc('singleton');[m
+[31m -    const unsubscribe = prefDocRef.onSnapshot((snap) => {[m
+[32m++    const ref = db.collection('users').doc(user.uid).collection('preferences').doc('singleton');[m
+[32m++    const unsub = ref.onSnapshot((snap) => {[m
+[32m+       const data = (snap.data() as any) || {};[m
+[32m+       setNotifPrefs({[m
+[32m+         jig: data?.notificationPrefs?.jig !== false,[m
+[32m+         work: data?.notificationPrefs?.work !== false,[m
+[32m+         quality: data?.notificationPrefs?.quality !== false,[m
+[32m+         sample: data?.notificationPrefs?.sample !== false,[m
+[32m+       });[m
+[32m+     });[m
+[31m -    return () => unsubscribe();[m
+[32m++    return () => unsub();[m
+[32m+   }, []);[m
+[32m+ [m
+    return ([m
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg h-full overflow-auto">[m
+        <div className="p-6">[m
+[36m@@@ -123,9 -147,67 +144,67 @@@[m
+  [m
+            {currentUserProfile?.role === 'Admin' && <UserManagement currentUserProfile={currentUserProfile} />}[m
+  [m
+[32m++          {/* 알림 설정 (FCM 복구 시 표시) */}[m
+[32m+           <div className="p-4 border dark:border-slate-700 rounded-lg">[m
+[32m+             <h3 className="text-lg font-semibold text-gray-700 dark:text-slate-200 mb-2">알림 설정</h3>[m
+[32m+             <p className="text-sm text-gray-500 dark:text-slate-400 mb-3">공지는 모든 사용자에게 공통 발송됩니다. 아래에서 나머지 카테고리를 개별 설정할 수 있어요.</p>[m
+[32m+             <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4">[m
+[32m+               {[[m
+[32m+                 { key: 'jig', label: '지그' },[m
+[32m+                 { key: 'work', label: '생산' },[m
+[32m+                 { key: 'quality', label: '품질' },[m
+[32m+                 { key: 'sample', label: '샘플' },[m
+[32m+               ].map(({ key, label }) => {[m
+[32m+                 const isOn = (notifPrefs as any)[key] === true;[m
+[32m+                 return ([m
+[32m+                   <div key={key} className="inline-flex items-center gap-3">[m
+[32m+                     <button[m
+[32m+                       type="button"[m
+[32m+                       role="switch"[m
+[32m+                       aria-checked={isOn}[m
+[32m+                       onClick={async () => {[m
+[32m+                         const user = firebase.auth().currentUser;[m
+[32m+                         if (!user) return;[m
+[32m+                         const next = !isOn;[m
+[32m+ [m
+[32m+                         // When turning ON, ensure notification permission is granted[m
+[32m+                         if (next) {[m
+[32m+                           try {[m
+[32m+                             if (typeof window !== 'undefined' && 'Notification' in window) {[m
+[32m+                               let perm: NotificationPermission = Notification.permission;[m
+[32m+                               if (perm === 'default') {[m
+[32m+                                 perm = await Notification.requestPermission();[m
+[32m+                               }[m
+[32m+                               if (perm !== 'granted') {[m
+[32m+                                 alert('브라우저 알림 권한이 필요합니다. 사이트 설정에서 알림을 허용해 주세요.');[m
+[32m+                                 return; // Do not toggle on if permission not granted[m
+[32m+                               }[m
+[31m -                              // Ensure FCM is initialized to get/save token[m
+[31m -                              try { await initFCM(); } catch (e) { /* no-op */ }[m
+[32m++                              // App 부팅 시 FCM 초기화됨(index.tsx). 여기서는 권한만 보장.[m
+[32m+                             }[m
+[32m+                           } catch (e) {[m
+[32m+                             // Safe fallback; continue without blocking UI if something goes wrong[m
+[32m+                           }[m
+[32m+                         }[m
+[32m+ [m
+[32m+                         setNotifPrefs((prev) => ({ ...(prev as any), [key]: next } as any));[m
+[32m+                         const update: any = {};[m
+[32m+                         update[`notificationPrefs.${key}`] = next;[m
+[32m+                         await db.collection('users').doc(user.uid).collection('preferences').doc('singleton').set(update, { merge: true });[m
+[32m+                       }}[m
+[32m+                       className={`w-12 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 ${isOn ? 'bg-green-500 dark:bg-green-600 focus:ring-green-500' : 'bg-slate-300 dark:bg-slate-700 focus:ring-slate-400 dark:focus:ring-slate-500'}`}[m
+[32m+                     >[m
+[32m+                       <span className={`block w-5 h-5 bg-white rounded-full shadow transform transition-transform ${isOn ? 'translate-x-0.5' : 'translate-x-6'}`} />[m
+[32m+                     </button>[m
+[32m+                     <span className="text-sm text-gray-700 dark:text-slate-200">{label}</span>[m
+[32m+                   </div>[m
+[32m+                 );[m
+[32m+               })}[m
+[32m+             </div>[m
+[32m+           </div>[m
+[32m+ [m
+            <div className="p-4 border dark:border-slate-700 rounded-lg">[m
+[31m--             <h3 className="text-lg font-semibold text-gray-700 dark:text-slate-200 mb-4">앱 정보</h3>[m
+[31m--             <div className="flex flex-col sm:flex-row items-center gap-6">[m
+[32m++            <h3 className="text-lg font-semibold text-gray-700 dark:text-slate-200 mb-4">앱 정보</h3>[m
+[32m++            <div className="flex flex-col sm:flex-row items-center gap-6">[m
+                  <div className="flex-shrink-0 w-32 h-32 rounded-2xl shadow-lg flex items-center justify-center overflow-hidden">[m
+                      <AppIcon className="w-full h-full" />[m
+                  </div>[m

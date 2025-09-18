@@ -38,6 +38,7 @@ import MainHeader from './components/MainHeader';
 
 import { db, storage, auth } from './firebaseConfig';
 import firebase from 'firebase/compat/app';
+import 'firebase/compat/firestore';
 import 'firebase/compat/auth';
 
 
@@ -102,7 +103,7 @@ const ToastContainer: React.FC<{ toasts: Toast[]; onRemove: (id: number) => void
 
 // FIX: Changed App to a named export to resolve module resolution error in index.tsx.
 export const App: React.FC = () => {
-  const [user, setUser] = useState<firebase.User | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [requests, setRequests] = useState<JigRequest[]>([]);
@@ -1658,7 +1659,7 @@ export const App: React.FC = () => {
         }
     
         try {
-            const schedulesToDeleteRefs: firebase.firestore.DocumentReference[] = [];
+            const schedulesToDeleteRefs: any[] = [];
             // Firestore 'in' queries are limited to 30 values.
             const dateChunks: string[][] = [];
             for (let i = 0; i < uniqueDates.length; i += 30) {
@@ -1743,7 +1744,7 @@ export const App: React.FC = () => {
         }
 
         try {
-            const ordersToDeleteRefs: firebase.firestore.DocumentReference[] = [];
+            const ordersToDeleteRefs: any[] = [];
             // Firestore 'in' queries are limited to 30 values.
             const dateChunks: string[][] = [];
             for (let i = 0; i < uniqueDates.length; i += 30) {

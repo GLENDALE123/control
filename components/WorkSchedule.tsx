@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { db, storage } from '../firebaseConfig';
 import { UserProfile, WorkSchedule as WorkScheduleType, Announcement } from '../types';
 import firebase from 'firebase/compat/app';
+import 'firebase/compat/firestore';
 
 
 declare const html2canvas: any;
@@ -74,7 +75,7 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth();
 
-        let query: firebase.firestore.Query = db.collection('work-schedules');
+        let query = db.collection('work-schedules');
 
         if (view === 'month') {
             const endDate = new Date(year, month + 1, 0).getDate();
@@ -130,7 +131,7 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
         const daysInYear = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 366 : 365;
         let totalDays = view === 'year' ? daysInYear : new Date(year, month + 1, 0).getDate();
         
-        const sourceSchedules = Array.from(schedules.values());
+        const sourceSchedules: WorkScheduleType[] = Array.from(schedules.values());
         
         let workDays = 0;
         const typeCounts = Object.keys(WORK_TYPES).reduce((acc, key) => ({ ...acc, [key]: 0 }), {} as Record<string, number>);
