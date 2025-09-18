@@ -168,10 +168,15 @@ export const App: React.FC = () => {
 
   const addToast = useCallback((toast: { message: string; type: ToastType; progress?: { current: number; total: number } }) => {
     const id = Date.now() + Math.random();
-    setToasts(prevToasts => [...prevToasts, { ...toast, id }]);
     
-    // Progress 토스트는 자동으로 제거하지 않음 (수동으로 제거해야 함)
-    if (toast.type !== 'progress') {
+    if (toast.type === 'progress') {
+      // Progress 토스트는 기존 progress 토스트를 제거하고 새로 추가
+      setToasts(prevToasts => {
+        const filteredToasts = prevToasts.filter(t => t.type !== 'progress');
+        return [...filteredToasts, { ...toast, id }];
+      });
+    } else {
+      setToasts(prevToasts => [...prevToasts, { ...toast, id }]);
       setTimeout(() => {
         removeToast(id);
       }, 3000);

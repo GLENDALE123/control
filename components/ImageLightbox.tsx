@@ -24,7 +24,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({ imageUrl, onClose }) => {
           alt="Enlarged view" 
           loading="eager"
           decoding="async"
-          fetchpriority="high"
+          fetchPriority="high"
           className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
           onClick={e => e.stopPropagation()}
         />

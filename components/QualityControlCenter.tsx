@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback, ChangeEvent }
 import QualityNavigation from './QualityNavigation';
 import { UserProfile, QualityInspection, InspectionType, HistoryEntry, Comment, Status, GroupedInspectionData, InspectionResult, WorkerResult, DefectReason, WorkerInspectionData, KeywordPair, TestResultDetail, ProcessLineData, ReliabilityReview } from '../types';
 import { db, storage } from '../firebaseConfig';
+import { uploadBytes, getDownloadURL } from 'firebase/storage';
 import FullScreenModal from './FullScreenModal';
 import ConfirmationModal from './ConfirmationModal';
 import CommentsSection from './CommentsSection';
@@ -310,7 +311,7 @@ const InspectionDetailsList: React.FC<{ inspection: QualityInspection; onImageCl
                                     height={96}
                                     loading="lazy"
                                     decoding="async"
-                                    fetchpriority="low"
+                                    fetchPriority="low"
                                     className="w-full h-24 object-cover rounded-md cursor-pointer transition-transform hover:scale-105"
                                     onClick={() => onImageClick(url)}
                                 />
@@ -2326,16 +2327,38 @@ const CircleCenter: React.FC<{
                         progress: { current: 0, total: imageFiles.length }
                     });
                     
-                    const addedUrls = await Promise.all(
-                        imageFiles.map(async (file, index) => {
+                    const addedUrls = [];
+                    for (let index = 0; index < imageFiles.length; index++) {
+                        const file = imageFiles[index];
+                        try {
+                            // 파일을 ArrayBuffer로 읽어서 손상 방지
+                            const arrayBuffer = await file.arrayBuffer();
                             const uniqueFileName = `${Date.now()}-${file.name}`;
                             const imageRef = storage.ref(`quality-inspections/${docId}/${uniqueFileName}`);
-                            const snapshot = await imageRef.put(file);
-                            const downloadURL = await snapshot.ref.getDownloadURL();
                             
-                            return downloadURL;
-                        })
-                    );
+                            // uploadBytes 사용 (최신 API)
+                            const snapshot = await uploadBytes(imageRef, arrayBuffer, {
+                                contentType: file.type || 'image/jpeg',
+                                customMetadata: {
+                                    originalName: file.name,
+                                    uploadedAt: new Date().toISOString()
+                                }
+                            });
+                            const downloadURL = await getDownloadURL(snapshot.ref);
+                            
+                            // 진행도 업데이트
+                            addToast({ 
+                                message: `이미지 업로드 중...`, 
+                                type: 'progress',
+                                progress: { current: index + 1, total: imageFiles.length }
+                            });
+                            
+                            addedUrls.push(downloadURL);
+                        } catch (error) {
+                            console.error(`이미지 업로드 실패 (${file.name}):`, error);
+                            throw new Error(`이미지 업로드 실패: ${file.name}`);
+                        }
+                    }
                     
                     // 기존 목록에서 삭제된 것 제외하고 새 이미지 추가
                     const docSnap = await db.collection('quality-inspections').doc(docId).get();
@@ -2406,16 +2429,38 @@ const CircleCenter: React.FC<{
                         progress: { current: 0, total: imageFiles.length }
                     });
                     
-                    const imageUrls = await Promise.all(
-                        imageFiles.map(async (file, index) => {
+                    const imageUrls = [];
+                    for (let index = 0; index < imageFiles.length; index++) {
+                        const file = imageFiles[index];
+                        try {
+                            // 파일을 ArrayBuffer로 읽어서 손상 방지
+                            const arrayBuffer = await file.arrayBuffer();
                             const uniqueFileName = `${Date.now()}-${file.name}`;
                             const imageRef = storage.ref(`quality-inspection-images/${newDocRef.id}/${uniqueFileName}`);
-                            const snapshot = await imageRef.put(file);
-                            const downloadURL = await snapshot.ref.getDownloadURL();
                             
-                            return downloadURL;
-                        })
-                    );
+                            // uploadBytes 사용 (최신 API)
+                            const snapshot = await uploadBytes(imageRef, arrayBuffer, {
+                                contentType: file.type || 'image/jpeg',
+                                customMetadata: {
+                                    originalName: file.name,
+                                    uploadedAt: new Date().toISOString()
+                                }
+                            });
+                            const downloadURL = await getDownloadURL(snapshot.ref);
+                            
+                            // 진행도 업데이트
+                            addToast({ 
+                                message: `이미지 업로드 중...`, 
+                                type: 'progress',
+                                progress: { current: index + 1, total: imageFiles.length }
+                            });
+                            
+                            imageUrls.push(downloadURL);
+                        } catch (error) {
+                            console.error(`이미지 업로드 실패 (${file.name}):`, error);
+                            throw new Error(`이미지 업로드 실패: ${file.name}`);
+                        }
+                    }
                     await newDocRef.update({ imageUrls });
                     
                     // Progress 토스트 제거하고 완료 토스트 표시

@@ -200,7 +200,7 @@ const RequestDetail: React.FC<RequestDetailProps> = ({ request, onStatusUpdate, 
                                   height={96}
                                   loading="lazy"
                                   decoding="async"
-                                  fetchpriority="low"
+                                  fetchPriority="low"
                                   className="w-full h-24 object-cover rounded-lg cursor-pointer transition-transform hover:scale-105"
                                   onClick={() => openLightbox(url)}
                               />
