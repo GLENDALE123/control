@@ -962,7 +962,7 @@ const SelectInput: React.FC<{ value: string; onChange: (e: React.ChangeEvent<HTM
         className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md focus:ring-primary-500 focus:border-primary-500 bg-slate-50 dark:bg-slate-700/50"
     >
         <option value="">선택...</option>
-        {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+        {options.map((opt, index) => <option key={`${opt}-${index}`} value={opt}>{opt}</option>)}
     </select>
 );
 
@@ -981,7 +981,7 @@ const DatalistInput: React.FC<{ value: string; onChange: (e: React.ChangeEvent<H
         
     />
     <datalist id={`${name}-list`}>
-        {options.map(opt => <option key={opt} value={opt} />)}
+        {options.map((opt, index) => <option key={`${opt}-${index}`} value={opt} />)}
     </datalist>
     </>
 );
