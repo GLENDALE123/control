@@ -711,13 +711,22 @@ const ControlCenter: React.FC<{
 
             switch (filters.type) {
                 case 'today':
-                    data = data.filter(group => new Date(group.latestDate) >= todayStart);
+                    data = data.filter(group => {
+                        const allInspections = [...group.incoming, ...group.inProcess, ...group.outgoing];
+                        return allInspections.some(inspection => {
+                            const inspectionDate = inspection.inspectionDate || inspection.createdAt;
+                            return new Date(inspectionDate) >= todayStart;
+                        });
+                    });
                     break;
                 case 'urgent':
                     data = data.filter(group => {
-                        const isToday = new Date(group.latestDate) >= todayStart;
-                        if (!isToday) return false;
                         const allInspections = [...group.incoming, ...group.inProcess, ...group.outgoing];
+                        const isToday = allInspections.some(inspection => {
+                            const inspectionDate = inspection.inspectionDate || inspection.createdAt;
+                            return new Date(inspectionDate) >= todayStart;
+                        });
+                        if (!isToday) return false;
                         return allInspections.some(insp => insp.result === '불합격' || insp.result === '한도대기');
                     });
                     break;
@@ -748,8 +757,13 @@ const ControlCenter: React.FC<{
         } else {
              // Apply local date filters only if no dashboard filter is active and no search term.
             data = data.filter(group => {
-                const groupDate = group.latestDate.split('T')[0];
-                return groupDate >= startDate && groupDate <= endDate;
+                // Check if any inspection in the group matches the date range
+                const allInspections = [...group.incoming, ...group.inProcess, ...group.outgoing];
+                return allInspections.some(inspection => {
+                    const inspectionDate = inspection.inspectionDate || inspection.createdAt;
+                    const dateStr = inspectionDate.split('T')[0];
+                    return dateStr >= startDate && dateStr <= endDate;
+                });
             });
         }
         
@@ -2609,7 +2623,7 @@ export const QualityControlCenter: React.FC<QualityControlCenterProps> = ({ them
         const group = groups.get(key)!;
         
         if (new Date(inspection.createdAt) > new Date(group.latestDate)) {
-            group.latestDate = inspection.createdAt;
+            group.latestDate = inspection.inspectionDate || inspection.createdAt;
             group.productName = inspection.productName;
             group.common = {
                 sequentialId: inspection.sequentialId,
