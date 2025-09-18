@@ -217,10 +217,11 @@ const WorkSchedule: React.FC<WorkScheduleProps> = ({ addToast, currentUserProfil
                   <head>
                     <title>​</title>
                      <style>
-                       @page { size: A4 landscape; margin: 0; }
+                      @page { size: A4 landscape; margin: 0; }
                       html, body { margin: 0; padding: 0; height: 100%; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                      .page { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-                      .page img { display:block; max-width: 100%; max-height: 100%; width: auto; height: auto; page-break-inside: avoid; image-rendering: -webkit-optimize-contrast; }
+                      /* A4 고정 컨테이너로 화면 크기와 무관한 일관 레이아웃 유지 */
+                      .page { width: 297mm; height: 210mm; display: flex; align-items: center; justify-content: center; }
+                      .page img { display:block; width: 100%; height: 100%; object-fit: contain; page-break-inside: avoid; image-rendering: -webkit-optimize-contrast; }
                     </style>
                   </head>
                   <body>
