@@ -5,6 +5,7 @@ import { db, storage } from '../firebaseConfig';
 import { uploadBytes, getDownloadURL } from 'firebase/storage';
 import { createImageChangeHandler } from '../utils/imageUpload';
 import { deleteImagesWithCompatibility, logImagePathMigration } from '../utils/imagePathMigration';
+import { processImagesOnServer, deleteImagesOnServer } from '../utils/serverImageProcessing';
 import FullScreenModal from './FullScreenModal';
 import ConfirmationModal from './ConfirmationModal';
 import CommentsSection from './CommentsSection';
@@ -2324,75 +2325,40 @@ const CircleCenter: React.FC<{
                 const { id, createdAt, history, inspector, ...dataToSave } = formData;
                 await onUpdateInspection(docId, dataToSave, '사용자에 의해 수정됨');
 
-                // 이미지 삭제 처리 (Storage에서 삭제) - 경로 호환성 처리 포함
+                // 이미지 삭제 처리 (서버사이드)
                 if (deletedImages.length > 0) {
-                    logImagePathMigration(deletedImages);
-                    const { success, failed } = await deleteImagesWithCompatibility(deletedImages);
+                    addToast({ message: "이미지 삭제 중...", type: 'info' });
+                    const deleteResult = await deleteImagesOnServer(deletedImages);
                     
-                    if (failed.length > 0) {
-                        console.warn(`이미지 삭제 실패 (${failed.length}개):`, failed);
+                    if (deleteResult.results.failed.length > 0) {
                         addToast({ 
-                            message: `일부 이미지 삭제에 실패했습니다. (${failed.length}개)`, 
+                            message: `일부 이미지 삭제에 실패했습니다. (${deleteResult.results.failed.length}개)`, 
                             type: 'warning' 
                         });
                     }
-                    
-                    if (success.length > 0) {
-                        console.log(`이미지 삭제 성공 (${success.length}개):`, success);
-                    }
                 }
 
-                // 이미지 추가/교체 업로드 처리
+                // 새 이미지 서버사이드 처리
                 if (imageFiles && imageFiles.length > 0) {
-                    addToast({ 
-                        message: `이미지 업로드 중...`, 
-                        type: 'progress',
-                        progress: { current: 0, total: imageFiles.length }
-                    });
+                    addToast({ message: "이미지 처리 중...", type: 'info' });
+                    const processResult = await processImagesOnServer(docId, imageFiles, 'quality');
                     
-                    const addedUrls = [];
-                    for (let index = 0; index < imageFiles.length; index++) {
-                        const file = imageFiles[index];
-                        try {
-                            const uniqueFileName = `${Date.now()}-${file.name}`;
-                            const imageRef = storage.ref(`quality-inspections/${docId}/${uniqueFileName}`);
-                            
-                            // uploadBytes 사용 (최신 API) - File 객체 직접 사용
-                            const snapshot = await uploadBytes(imageRef, file, {
-                                contentType: file.type || 'image/jpeg',
-                                customMetadata: {
-                                    originalName: file.name,
-                                    uploadedAt: new Date().toISOString()
-                                }
-                            });
-                            const downloadURL = await getDownloadURL(snapshot.ref);
-                            
-                            // 진행도 업데이트
-                            addToast({ 
-                                message: `이미지 업로드 중...`, 
-                                type: 'progress',
-                                progress: { current: index + 1, total: imageFiles.length }
-                            });
-                            
-                            addedUrls.push(downloadURL);
-                        } catch (error) {
-                            console.error(`이미지 업로드 실패 (${file.name}):`, error);
-                            const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
-                            throw new Error(`이미지 업로드 실패 (${file.name}): ${errorMessage}`);
-                        }
+                    if (processResult.results.failed > 0) {
+                        addToast({ 
+                            message: `이미지 처리 완료 (성공: ${processResult.results.successful}, 실패: ${processResult.results.failed})`, 
+                            type: 'warning' 
+                        });
+                    } else {
+                        addToast({ message: `이미지 ${processResult.results.successful}개 처리 완료`, type: 'success' });
                     }
                     
-                    // 기존 목록에서 삭제된 것 제외하고 새 이미지 추가
+                    // DB에 처리된 이미지 URL 업데이트
                     const docSnap = await db.collection('quality-inspections').doc(docId).get();
                     const prev = (docSnap.data()?.imageUrls as string[]) || [];
                     const remainingImages = prev.filter(img => !deletedImages.includes(img));
                     await db.collection('quality-inspections').doc(docId).update({
-                        imageUrls: [...remainingImages, ...addedUrls]
+                        imageUrls: [...remainingImages, ...processResult.processedImages]
                     });
-                    
-                    // Progress 토스트 제거하고 완료 토스트 표시
-                    removeAllProgressToasts();
-                    addToast({ message: `이미지 ${addedUrls.length}개 업로드 완료`, type: 'success' });
                 } else if (deletedImages.length > 0) {
                     // 새 이미지가 없고 삭제만 있는 경우
                     const docSnap = await db.collection('quality-inspections').doc(docId).get();
@@ -2445,48 +2411,20 @@ const CircleCenter: React.FC<{
                 const newDocRef = await db.collection('quality-inspections').add(payload);
     
                  if (imageFiles.length > 0) {
-                    addToast({ 
-                        message: `이미지 업로드 중...`, 
-                        type: 'progress',
-                        progress: { current: 0, total: imageFiles.length }
-                    });
+                    addToast({ message: "이미지 처리 중...", type: 'info' });
+                    const processResult = await processImagesOnServer(newDocRef.id, imageFiles, 'quality');
                     
-                    const imageUrls = [];
-                    for (let index = 0; index < imageFiles.length; index++) {
-                        const file = imageFiles[index];
-                        try {
-                            const uniqueFileName = `${Date.now()}-${file.name}`;
-                            const imageRef = storage.ref(`quality-inspections/${newDocRef.id}/${uniqueFileName}`);
-                            
-                            // uploadBytes 사용 (최신 API) - File 객체 직접 사용
-                            const snapshot = await uploadBytes(imageRef, file, {
-                                contentType: file.type || 'image/jpeg',
-                                customMetadata: {
-                                    originalName: file.name,
-                                    uploadedAt: new Date().toISOString()
-                                }
-                            });
-                            const downloadURL = await getDownloadURL(snapshot.ref);
-                            
-                            // 진행도 업데이트
-                            addToast({ 
-                                message: `이미지 업로드 중...`, 
-                                type: 'progress',
-                                progress: { current: index + 1, total: imageFiles.length }
-                            });
-                            
-                            imageUrls.push(downloadURL);
-                        } catch (error) {
-                            console.error(`이미지 업로드 실패 (${file.name}):`, error);
-                            const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
-                            throw new Error(`이미지 업로드 실패 (${file.name}): ${errorMessage}`);
-                        }
+                    if (processResult.results.failed > 0) {
+                        addToast({ 
+                            message: `이미지 처리 완료 (성공: ${processResult.results.successful}, 실패: ${processResult.results.failed})`, 
+                            type: 'warning' 
+                        });
+                    } else {
+                        addToast({ message: `이미지 ${processResult.results.successful}개 처리 완료`, type: 'success' });
                     }
-                    await newDocRef.update({ imageUrls });
                     
-                    // Progress 토스트 제거하고 완료 토스트 표시
-                    removeAllProgressToasts();
-                    addToast({ message: `이미지 ${imageUrls.length}개 업로드 완료`, type: 'success' });
+                    // DB에 처리된 이미지 URL 업데이트
+                    await newDocRef.update({ imageUrls: processResult.processedImages });
                 }
 
                 await db.collection('notifications').add({
