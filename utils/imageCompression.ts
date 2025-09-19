@@ -1,4 +1,5 @@
 import imageCompression from 'browser-image-compression';
+import heic2any from 'heic2any';
 
 export interface CompressionOptions {
     maxSizeMB?: number;
@@ -16,6 +17,38 @@ export interface CompressionResult {
     originalSize?: number;
     compressedSize?: number;
 }
+
+/**
+ * HEIC/HEIF 파일을 JPEG로 변환합니다
+ * @param file HEIC/HEIF 파일
+ * @returns 변환된 JPEG 파일
+ */
+const convertHeicToJpeg = async (file: File): Promise<File> => {
+    try {
+        console.log(`HEIC 변환 시작: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+        
+        const convertedBlob = await heic2any({
+            blob: file,
+            toType: 'image/jpeg',
+            quality: 0.8
+        });
+        
+        // heic2any는 Blob 또는 Blob 배열을 반환할 수 있음
+        const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+        
+        // Blob을 File로 변환
+        const convertedFile = new File([blob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), {
+            type: 'image/jpeg',
+            lastModified: Date.now()
+        });
+        
+        console.log(`HEIC 변환 완료: ${convertedFile.name} (${(convertedFile.size / 1024 / 1024).toFixed(2)}MB)`);
+        return convertedFile;
+    } catch (error) {
+        console.error('HEIC 변환 실패:', error);
+        throw new Error(`HEIC 변환 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+    }
+};
 
 /**
  * 이미지 파일을 압축합니다
@@ -41,6 +74,13 @@ export const compressImageFile = async (
         // HEIC/HEIF 파일은 크기에 관계없이 항상 변환
         const isHeicFile = file.type.toLowerCase() === 'image/heic' || file.type.toLowerCase() === 'image/heif';
         
+        let fileToCompress = file;
+        
+        // HEIC 파일인 경우 먼저 JPEG로 변환
+        if (isHeicFile) {
+            fileToCompress = await convertHeicToJpeg(file);
+        }
+        
         // HEIC가 아니고 2MB 미만이면 압축하지 않음
         if (!isHeicFile && file.size <= 2 * 1024 * 1024) {
             return {
@@ -51,10 +91,10 @@ export const compressImageFile = async (
             };
         }
 
-        const compressedFile = await imageCompression(file, defaultOptions);
+        const compressedFile = await imageCompression(fileToCompress, defaultOptions);
         
         if (isHeicFile) {
-            console.log(`HEIC 변환 완료: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB (JPEG)`);
+            console.log(`HEIC 변환 및 압축 완료: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB (JPEG)`);
         } else {
             console.log(`압축 완료: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
         }
