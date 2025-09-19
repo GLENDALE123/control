@@ -1079,10 +1079,10 @@ const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
             setExistingImages([]);
             setImagePreviews([]);
         }
-        // Always clear new image files and deleted images when switching inspections
+        // Only clear new image files and deleted images when switching to a different inspection
         setImageFiles([]);
         setDeletedImages([]);
-    }, [existingInspection]);
+    }, [existingInspection?.id]); // Only trigger when inspection ID changes
 
      useEffect(() => {
         // Cleanup object URLs to avoid memory leaks
@@ -1401,10 +1401,10 @@ const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserPro
             setExistingImages([]);
             setImagePreviews([]);
         }
-        // Always clear new image files and deleted images when switching inspections
+        // Only clear new image files and deleted images when switching to a different inspection
         setImageFiles([]);
         setDeletedImages([]);
-    }, [existingInspection]);
+    }, [existingInspection?.id]); // Only trigger when inspection ID changes
 
      useEffect(() => {
         // Cleanup object URLs to avoid memory leaks
@@ -1943,10 +1943,10 @@ const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
             setExistingImages([]);
             setImagePreviews([]);
         }
-        // Always clear new image files and deleted images when switching inspections
+        // Only clear new image files and deleted images when switching to a different inspection
         setImageFiles([]);
         setDeletedImages([]);
-    }, [existingInspection]);
+    }, [existingInspection?.id]); // Only trigger when inspection ID changes
 
      useEffect(() => {
         // Cleanup object URLs to avoid memory leaks
