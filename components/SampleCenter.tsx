@@ -58,7 +58,7 @@ const StatusBoard: React.FC<{ sampleRequests: SampleRequest[], onCellClick: (sta
         sampleRequests.forEach(req => {
             const uniqueMethods = new Set(req.items.map(item => item.coatingMethod));
             uniqueMethods.forEach(method => {
-                if(COATING_METHODS.includes(method)) {
+                if(COATING_METHODS.includes(method as string)) {
                     const key = `${method}-${req.status}`;
                     counts.set(key, (counts.get(key) || 0) + 1);
                 }

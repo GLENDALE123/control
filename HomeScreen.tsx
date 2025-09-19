@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import AppIcon from './components/AppIcon';
 import AppGuide from './components/AppGuide';
-import { Notification, ActiveCenter } from '../types';
+import { Notification, ActiveCenter } from './types';
 
 interface HomeScreenProps {
     onSelectCenter: (center: ActiveCenter) => void;

@@ -1,5 +1,5 @@
 import React, { useState, ChangeEvent, FormEvent, useEffect, useMemo, useRef } from 'react';
-import { JigRequest, MasterData } from '../types';
+import { JigRequest, MasterData } from './types';
 
 interface RequestFormProps {
   onSave: (
@@ -95,7 +95,7 @@ const RequestForm: React.FC<RequestFormProps> = ({ onSave, onCancel, existingReq
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files);
-      const newPreviews = files.map(file => URL.createObjectURL(file));
+      const newPreviews = files.map(file => URL.createObjectURL(file as Blob));
       setImageFiles(prev => [...prev, ...files]);
       setImagePreviews(prev => [...prev, ...newPreviews]);
     }

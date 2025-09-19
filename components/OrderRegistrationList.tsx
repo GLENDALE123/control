@@ -260,7 +260,7 @@ const OrderRegistrationList: FC<OrderRegistrationListProps> = ({ orders, onSave,
                 const val = o[key];
                 return (val === null || val === undefined || val === '') ? '(비어 있음)' : String(val);
             }));
-            options[key] = Array.from(values).sort((a, b) => a.localeCompare(b, 'ko'));
+            options[key] = Array.from(values).sort((a, b) => (a as string).localeCompare(b as string, 'ko')) as string[];
         });
         
         return options;
@@ -271,16 +271,16 @@ const OrderRegistrationList: FC<OrderRegistrationListProps> = ({ orders, onSave,
 
         Object.entries(filters).forEach(([key, selectedValues]) => {
             const allOptions = columnOptions[key];
-            if (!allOptions || selectedValues.size === allOptions.length) {
+            if (!allOptions || (selectedValues as Set<string>).size === allOptions.length) {
                 return; 
             }
-            if (selectedValues.size === 0) {
+            if ((selectedValues as Set<string>).size === 0) {
                  filteredData = [];
             } else {
                  filteredData = filteredData.filter(order => {
                     const value = order[key as keyof Order];
                     const valueStr = (value === null || value === undefined || value === '') ? '(비어 있음)' : String(value);
-                    return selectedValues.has(valueStr);
+                    return (selectedValues as Set<string>).has(valueStr);
                 });
             }
         });

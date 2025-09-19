@@ -469,7 +469,7 @@ export const ProductionScheduleList: React.FC<ProductionScheduleListProps> = ({ 
                                         </div>
                                     </th>
                                 </tr>
-                                {schedulesForDate.map((s) => (
+                                {(schedulesForDate as any[]).map((s) => (
                                     <tr key={s.id} className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
                                         {fixedHeaderOrder.map(key => {
                                             const value = s[key];

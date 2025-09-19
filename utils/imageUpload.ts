@@ -1,3 +1,4 @@
+import React from 'react';
 import { compressImageFiles, validateFileSizes, validateImageTypes } from './imageCompression';
 
 export interface ImageUploadResult {
@@ -85,7 +86,7 @@ export const createImageChangeHandler = (
 ) => {
     return async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            const files = Array.from(e.target.files);
+            const files = Array.from(e.target.files) as File[];
             const result = await processImageFiles(files, addToast);
             
             if (result.success) {

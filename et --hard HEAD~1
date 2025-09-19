@@ -1,0 +1,30 @@
+[33mcommit 7f540b50ed5e9affa6e924eaf1539d54ac596812[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: HRY <hry@smartqc.com>
+Date:   Fri Sep 19 09:49:08 2025 +0900
+
+    feat: HEIC 이미지 표시 지원 추가
+    
+    - HEIC 파일 자동 변환 및 표시 기능 구현
+    - HeicImage 컴포넌트로 HEIC 파일을 JPEG로 변환하여 표시
+    - 기존 HEIC 파일들이 브라우저에서 표시되지 않는 문제 해결
+    - 변환 실패 시 대체 이미지 및 로딩 상태 표시
+    - 메모리 누수 방지를 위한 변환 캐시 관리
+    
+    주요 변경사항:
+    - utils/heicConverter.ts: HEIC 변환 핵심 로직
+    - components/HeicImage.tsx: HEIC 이미지 표시 컴포넌트
+    - QualityControlCenter.tsx: 기존 이미지 표시를 HeicImage로 교체
+    - ImageLightbox.tsx: 라이트박스에서 HEIC 지원
+    - JigRequestCard.tsx, SampleRequestDetail.tsx: HEIC 이미지 지원
+    
+    해결된 문제:
+    - 기존 업로드된 HEIC 파일들이 이미지로 표시되지 않는 문제
+    - 브라우저 호환성 문제로 인한 이미지 표시 실패
+
+ components/HeicImage.tsx            | 108 [32m++++++++++++++++++++++++++++[m
+ components/ImageLightbox.tsx        |   5 [32m+[m[31m-[m
+ components/JigRequestCard.tsx       |   3 [32m+[m[31m-[m
+ components/QualityControlCenter.tsx |  11 [32m++[m[31m-[m
+ components/SampleRequestDetail.tsx  |   3 [32m+[m[31m-[m
+ utils/heicConverter.ts              | 138 [32m++++++++++++++++++++++++++++++++++++[m
+ 6 files changed, 257 insertions(+), 11 deletions(-)
