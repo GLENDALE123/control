@@ -182,17 +182,29 @@ const QualityIssueForm: React.FC<{
 };
 
 const QualityIssueCard: React.FC<{ issue: QualityIssue, onSelect: () => void }> = ({ issue, onSelect }) => {
+    const hasImages = issue.imageUrls && issue.imageUrls.length > 0;
+    
     return (
         <div 
             onClick={onSelect}
             className="bg-white dark:bg-slate-800 rounded-lg shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden p-4 flex flex-col gap-3"
         >
             <div className="flex justify-between items-start border-b border-slate-200 dark:border-slate-700 pb-2">
-                <div>
+                <div className="flex-1">
                     <h3 className="font-bold text-lg text-gray-900 dark:text-white">{issue.productName} ({issue.partName})</h3>
                     <p className="text-sm text-gray-500 dark:text-slate-400">{issue.supplier}</p>
                 </div>
-                <span className="font-mono text-2xl bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-md">{issue.orderNumber}</span>
+                <div className="flex flex-col items-end gap-2">
+                    <span className="font-mono text-2xl bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-md">{issue.orderNumber}</span>
+                    {hasImages && (
+                        <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <span>{issue.imageUrls?.length}개 이미지</span>
+                        </div>
+                    )}
+                </div>
             </div>
             <div>
                 <h4 className="font-semibold text-sm text-gray-700 dark:text-slate-300 mb-1">이슈사항:</h4>
@@ -217,6 +229,7 @@ const QualityIssueTable: React.FC<{ issues: QualityIssue[], onSelect: (issue: Qu
                     <th scope="col" className="px-4 py-3">부속명</th>
                     <th scope="col" className="px-4 py-3">발주처</th>
                     <th scope="col" className="px-4 py-3">첫번째 이슈</th>
+                    <th scope="col" className="px-4 py-3">이미지</th>
                     <th scope="col" className="px-4 py-3">작성자</th>
                     <th scope="col" className="px-4 py-3">작성일</th>
                 </tr>
@@ -229,6 +242,18 @@ const QualityIssueTable: React.FC<{ issues: QualityIssue[], onSelect: (issue: Qu
                         <td className="px-4 py-2">{issue.partName}</td>
                         <td className="px-4 py-2">{issue.supplier}</td>
                         <td className="px-4 py-2 truncate max-w-sm">{issue.issues[0]}</td>
+                        <td className="px-4 py-2">
+                            {issue.imageUrls && issue.imageUrls.length > 0 ? (
+                                <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    <span className="text-xs">{issue.imageUrls.length}</span>
+                                </div>
+                            ) : (
+                                <span className="text-gray-400 dark:text-slate-500 text-xs">없음</span>
+                            )}
+                        </td>
                         <td className="px-4 py-2">{issue.author}</td>
                         <td className="px-4 py-2 text-xs">{new Date(issue.createdAt).toLocaleDateString('ko-KR')}</td>
                     </tr>
@@ -273,6 +298,26 @@ const QualityIssueDetail: React.FC<{
                             {issue.keywordPairs.map((pair, index) => (
                                 <div key={index} className="text-sm p-2 bg-slate-100 dark:bg-slate-700/50 rounded-md">
                                     <span className="font-semibold">{pair.process}:</span> {pair.defect}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                {issue.imageUrls && issue.imageUrls.length > 0 && (
+                    <div className="mb-4">
+                        <h4 className="font-semibold text-md text-gray-800 dark:text-slate-200 mb-2">첨부 이미지:</h4>
+                        <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2">
+                            {issue.imageUrls.map((url, index) => (
+                                <div key={index} className="group relative">
+                                    <img
+                                        src={url}
+                                        alt={`첨부 이미지 ${index + 1}`}
+                                        className="w-full h-24 object-cover rounded-md cursor-pointer hover:opacity-80 transition-opacity"
+                                        onClick={() => {
+                                            // 이미지 클릭 시 라이트박스 열기 (추후 구현 가능)
+                                            window.open(url, '_blank');
+                                        }}
+                                    />
                                 </div>
                             ))}
                         </div>
