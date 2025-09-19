@@ -1074,7 +1074,14 @@ const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
         if (existingInspection && existingInspection.imageUrls && existingInspection.imageUrls.length > 0) {
             setExistingImages(existingInspection.imageUrls);
             setImagePreviews(existingInspection.imageUrls);
+        } else {
+            // Clear image states when not in edit mode
+            setExistingImages([]);
+            setImagePreviews([]);
         }
+        // Always clear new image files and deleted images when switching inspections
+        setImageFiles([]);
+        setDeletedImages([]);
     }, [existingInspection]);
 
      useEffect(() => {
@@ -1389,7 +1396,14 @@ const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserPro
         if (existingInspection && existingInspection.imageUrls && existingInspection.imageUrls.length > 0) {
             setExistingImages(existingInspection.imageUrls);
             setImagePreviews(existingInspection.imageUrls);
+        } else {
+            // Clear image states when not in edit mode
+            setExistingImages([]);
+            setImagePreviews([]);
         }
+        // Always clear new image files and deleted images when switching inspections
+        setImageFiles([]);
+        setDeletedImages([]);
     }, [existingInspection]);
 
      useEffect(() => {
@@ -1924,7 +1938,14 @@ const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
         if (existingInspection && existingInspection.imageUrls && existingInspection.imageUrls.length > 0) {
             setExistingImages(existingInspection.imageUrls);
             setImagePreviews(existingInspection.imageUrls);
+        } else {
+            // Clear image states when not in edit mode
+            setExistingImages([]);
+            setImagePreviews([]);
         }
+        // Always clear new image files and deleted images when switching inspections
+        setImageFiles([]);
+        setDeletedImages([]);
     }, [existingInspection]);
 
      useEffect(() => {
