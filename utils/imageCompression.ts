@@ -71,8 +71,11 @@ export const compressImageFile = async (
             ...options
         };
 
-        // HEIC/HEIF 파일은 크기에 관계없이 항상 변환
-        const isHeicFile = file.type.toLowerCase() === 'image/heic' || file.type.toLowerCase() === 'image/heif';
+        // HEIC/HEIF 파일은 크기에 관계없이 항상 변환 (MIME 타입 또는 확장자로 감지)
+        const isHeicFile = file.type.toLowerCase() === 'image/heic' || 
+                          file.type.toLowerCase() === 'image/heif' ||
+                          file.name.toLowerCase().endsWith('.heic') ||
+                          file.name.toLowerCase().endsWith('.heif');
         
         let fileToCompress = file;
         
@@ -196,13 +199,26 @@ export const validateImageTypes = (files: File[]): {
     message?: string;
 } => {
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
-    const invalidFiles = files.filter(file => !validTypes.includes(file.type.toLowerCase()));
+    
+    // 파일 확장자로도 HEIC 파일을 감지
+    const isHeicByExtension = (fileName: string) => {
+        const ext = fileName.toLowerCase().split('.').pop();
+        return ext === 'heic' || ext === 'heif';
+    };
+    
+    const invalidFiles = files.filter(file => {
+        const mimeType = file.type.toLowerCase();
+        const isHeicByMime = validTypes.includes(mimeType);
+        const isHeicByExt = isHeicByExtension(file.name);
+        
+        return !isHeicByMime && !isHeicByExt;
+    });
     
     if (invalidFiles.length > 0) {
         return {
             isValid: false,
             invalidFiles,
-            message: `지원되지 않는 파일 형식입니다. (${invalidFiles.map(f => f.name).join(', ')})`
+            message: `지원되지 않는 파일 형식입니다. JPEG, PNG, WebP, HEIC, HEIF 파일만 업로드 가능합니다. (${invalidFiles.map(f => f.name).join(', ')})`
         };
     }
     
