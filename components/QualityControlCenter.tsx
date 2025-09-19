@@ -3,6 +3,8 @@ import QualityNavigation from './QualityNavigation';
 import { UserProfile, QualityInspection, InspectionType, HistoryEntry, Comment, Status, GroupedInspectionData, InspectionResult, WorkerResult, DefectReason, WorkerInspectionData, KeywordPair, TestResultDetail, ProcessLineData, ReliabilityReview } from '../types';
 import { db, storage } from '../firebaseConfig';
 import { uploadBytes, getDownloadURL } from 'firebase/storage';
+import { createImageChangeHandler } from '../utils/imageUpload';
+import { deleteImagesWithCompatibility, logImagePathMigration } from '../utils/imagePathMigration';
 import FullScreenModal from './FullScreenModal';
 import ConfirmationModal from './ConfirmationModal';
 import CommentsSection from './CommentsSection';
@@ -1072,6 +1074,7 @@ const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
      useEffect(() => {
         // Load existing images when in edit mode
         if (existingInspection && existingInspection.imageUrls && existingInspection.imageUrls.length > 0) {
+            logImagePathMigration(existingInspection.imageUrls);
             setExistingImages(existingInspection.imageUrls);
             setImagePreviews(existingInspection.imageUrls);
         } else {
@@ -1091,14 +1094,7 @@ const IncomingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
         };
     }, [imagePreviews]);
 
-    const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            const files = Array.from(e.target.files);
-            const newPreviews = files.map(file => URL.createObjectURL(file as Blob | MediaSource));
-            setImageFiles(prev => [...prev, ...files] as File[]);
-            setImagePreviews(prev => [...prev, ...newPreviews]);
-        }
-    };
+    const handleImageChange = createImageChangeHandler(setImageFiles, setImagePreviews, addToast);
 
     const removeImage = (index: number) => {
         const imageUrl = imagePreviews[index];
@@ -1394,6 +1390,7 @@ const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserPro
      useEffect(() => {
         // Load existing images when in edit mode
         if (existingInspection && existingInspection.imageUrls && existingInspection.imageUrls.length > 0) {
+            logImagePathMigration(existingInspection.imageUrls);
             setExistingImages(existingInspection.imageUrls);
             setImagePreviews(existingInspection.imageUrls);
         } else {
@@ -1413,14 +1410,7 @@ const InProcessInspectionForm: React.FC<InspectionFormProps> = ({ currentUserPro
         };
     }, [imagePreviews]);
 
-    const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            const files = Array.from(e.target.files);
-            const newPreviews = files.map(file => URL.createObjectURL(file as Blob | MediaSource));
-            setImageFiles(prev => [...prev, ...files] as File[]);
-            setImagePreviews(prev => [...prev, ...newPreviews]);
-        }
-    };
+    const handleImageChange = createImageChangeHandler(setImageFiles, setImagePreviews, addToast);
 
     const removeImage = (index: number) => {
         const imageUrl = imagePreviews[index];
@@ -1936,6 +1926,7 @@ const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
      useEffect(() => {
         // Load existing images when in edit mode
         if (existingInspection && existingInspection.imageUrls && existingInspection.imageUrls.length > 0) {
+            logImagePathMigration(existingInspection.imageUrls);
             setExistingImages(existingInspection.imageUrls);
             setImagePreviews(existingInspection.imageUrls);
         } else {
@@ -1955,14 +1946,7 @@ const OutgoingInspectionForm: React.FC<InspectionFormProps> = ({ currentUserProf
         };
     }, [imagePreviews]);
 
-    const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            const files = Array.from(e.target.files);
-            const newPreviews = files.map(file => URL.createObjectURL(file as Blob | MediaSource));
-            setImageFiles(prev => [...prev, ...files] as File[]);
-            setImagePreviews(prev => [...prev, ...newPreviews]);
-        }
-    };
+    const handleImageChange = createImageChangeHandler(setImageFiles, setImagePreviews, addToast);
 
     const removeImage = (index: number) => {
         const imageUrl = imagePreviews[index];
@@ -2340,18 +2324,22 @@ const CircleCenter: React.FC<{
                 const { id, createdAt, history, inspector, ...dataToSave } = formData;
                 await onUpdateInspection(docId, dataToSave, '사용자에 의해 수정됨');
 
-                // 이미지 삭제 처리 (Storage에서 삭제)
+                // 이미지 삭제 처리 (Storage에서 삭제) - 경로 호환성 처리 포함
                 if (deletedImages.length > 0) {
-                    await Promise.all(
-                        deletedImages.map(async (url) => {
-                            try {
-                                const ref = storage.refFromURL(url);
-                                await ref.delete();
-                            } catch (error) {
-                                console.error('Failed to delete image:', error);
-                            }
-                        })
-                    );
+                    logImagePathMigration(deletedImages);
+                    const { success, failed } = await deleteImagesWithCompatibility(deletedImages);
+                    
+                    if (failed.length > 0) {
+                        console.warn(`이미지 삭제 실패 (${failed.length}개):`, failed);
+                        addToast({ 
+                            message: `일부 이미지 삭제에 실패했습니다. (${failed.length}개)`, 
+                            type: 'warning' 
+                        });
+                    }
+                    
+                    if (success.length > 0) {
+                        console.log(`이미지 삭제 성공 (${success.length}개):`, success);
+                    }
                 }
 
                 // 이미지 추가/교체 업로드 처리
@@ -2468,7 +2456,7 @@ const CircleCenter: React.FC<{
                         const file = imageFiles[index];
                         try {
                             const uniqueFileName = `${Date.now()}-${file.name}`;
-                            const imageRef = storage.ref(`quality-inspection-images/${newDocRef.id}/${uniqueFileName}`);
+                            const imageRef = storage.ref(`quality-inspections/${newDocRef.id}/${uniqueFileName}`);
                             
                             // uploadBytes 사용 (최신 API) - File 객체 직접 사용
                             const snapshot = await uploadBytes(imageRef, file, {

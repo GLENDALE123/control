@@ -37,6 +37,7 @@ import MainHeader from './components/MainHeader';
 
 
 import { db, storage, auth } from './firebaseConfig';
+import { deleteImagesWithCompatibility } from './utils/imagePathMigration';
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/firestore';
 import 'firebase/compat/auth';
@@ -741,15 +742,14 @@ export const App: React.FC = () => {
     try {
         const requestToDelete = requests.find(r => r.id === id);
         if (requestToDelete?.imageUrls) {
-            for (const url of requestToDelete.imageUrls) {
-                try {
-                   const imageRef = storage.refFromURL(url);
-                   await imageRef.delete();
-                } catch (storageError: any) {
-                   if (storageError.code !== 'storage/object-not-found') {
-                       console.error("Error deleting image from storage:", storageError);
-                   }
-                }
+            const { success, failed } = await deleteImagesWithCompatibility(requestToDelete.imageUrls);
+            
+            if (failed.length > 0) {
+                console.warn(`일부 이미지 삭제 실패 (${failed.length}개):`, failed);
+            }
+            
+            if (success.length > 0) {
+                console.log(`이미지 삭제 성공 (${success.length}개)`);
             }
         }
         await db.collection('jig-requests').doc(id).delete();
@@ -1030,16 +1030,15 @@ export const App: React.FC = () => {
     try {
         const jigToDelete = jigs.find(j => j.id === id);
         if (jigToDelete?.imageUrls) {
-           for (const url of jigToDelete.imageUrls) {
-               try {
-                  const imageRef = storage.refFromURL(url);
-                  await imageRef.delete();
-               } catch (storageError: any) {
-                  if (storageError.code !== 'storage/object-not-found') {
-                      console.error("Error deleting image from storage:", storageError);
-                  }
-               }
-           }
+            const { success, failed } = await deleteImagesWithCompatibility(jigToDelete.imageUrls);
+            
+            if (failed.length > 0) {
+                console.warn(`일부 이미지 삭제 실패 (${failed.length}개):`, failed);
+            }
+            
+            if (success.length > 0) {
+                console.log(`이미지 삭제 성공 (${success.length}개)`);
+            }
         }
         await db.collection('jig-masters').doc(id).delete();
         addToast({ message: "지그가 삭제되었습니다.", type: "success" });

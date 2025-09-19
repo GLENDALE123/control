@@ -4,6 +4,7 @@ import ConfirmationModal from './ConfirmationModal';
 import ImageLightbox from './ImageLightbox';
 import { storage } from '../firebaseConfig';
 import { uploadBytes, getDownloadURL } from 'firebase/storage';
+import { deleteImagesWithCompatibility } from '../utils/imagePathMigration';
 
 interface JigMasterDetailProps {
   jig: JigMasterItem;
@@ -164,15 +165,16 @@ const JigMasterDetail: React.FC<JigMasterDetailProps> = ({ jig, onSave, onDelete
         updatedImageUrls = [...updatedImageUrls, ...uploadedUrls];
       }
       
-      // 삭제된 이미지들을 Storage에서 제거
+      // 삭제된 이미지들을 Storage에서 제거 (경로 호환성 처리 포함)
       if (deletedImages.length > 0) {
-        for (const imageUrl of deletedImages) {
-          try {
-            const imageRef = storage.refFromURL(imageUrl);
-            await imageRef.delete();
-          } catch (error) {
-            console.error('이미지 삭제 실패:', error);
-          }
+        const { success, failed } = await deleteImagesWithCompatibility(deletedImages);
+        
+        if (failed.length > 0) {
+          console.warn(`일부 이미지 삭제 실패 (${failed.length}개):`, failed);
+        }
+        
+        if (success.length > 0) {
+          console.log(`이미지 삭제 성공 (${success.length}개)`);
         }
       }
       
