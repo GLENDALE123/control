@@ -38,8 +38,11 @@ export const compressImageFile = async (
             ...options
         };
 
-        // 파일 크기가 2MB 이상일 때만 압축
-        if (file.size <= 2 * 1024 * 1024) {
+        // HEIC/HEIF 파일은 크기에 관계없이 항상 변환
+        const isHeicFile = file.type.toLowerCase() === 'image/heic' || file.type.toLowerCase() === 'image/heif';
+        
+        // HEIC가 아니고 2MB 미만이면 압축하지 않음
+        if (!isHeicFile && file.size <= 2 * 1024 * 1024) {
             return {
                 success: true,
                 file: file,
@@ -50,7 +53,11 @@ export const compressImageFile = async (
 
         const compressedFile = await imageCompression(file, defaultOptions);
         
-        console.log(`압축 완료: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+        if (isHeicFile) {
+            console.log(`HEIC 변환 완료: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB (JPEG)`);
+        } else {
+            console.log(`압축 완료: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+        }
         
         return {
             success: true,

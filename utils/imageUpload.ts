@@ -41,7 +41,9 @@ export const processImageFiles = async (
         }
         
         // 이미지 압축 처리
+        console.log('파일 처리 시작:', files.map(f => ({ name: f.name, type: f.type, size: f.size })));
         const { compressedFiles, results } = await compressImageFiles(files);
+        console.log('압축된 파일:', compressedFiles.map(f => ({ name: f.name, type: f.type, size: f.size })));
         const previews = compressedFiles.map(file => URL.createObjectURL(file));
         
         // 압축 결과 로깅
