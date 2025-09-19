@@ -1,0 +1,54 @@
+[build]
+  # 빌드 명령어 - npm 캐시 클리어 후 설치 및 빌드
+  command = "npm ci && npm run build"
+  
+  # 빌드 출력 디렉토리
+  publish = "dist"
+
+[build.environment]
+  # Node.js 버전 설정 (Netlify에서 지원하는 안정 버전)
+  NODE_VERSION = "18"
+  
+  # npm 캐시 설정
+  NPM_CONFIG_CACHE = ".npm"
+  
+  # 빌드 최적화
+  NODE_OPTIONS = "--max-old-space-size=4096"
+
+# SPA 라우팅을 위한 리다이렉트 설정
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# 헤더 설정 (캐싱 등)
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# 빌드 전처리
+[build.processing]
+  skip_processing = false
+
+# 빌드 후처리
+[build.processing.css]
+  bundle = true
+  minify = true
+
+[build.processing.js]
+  bundle = true
+  minify = true
+
+[build.processing.html]
+  pretty_urls = true

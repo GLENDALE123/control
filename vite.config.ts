@@ -24,9 +24,17 @@ export default defineConfig(({ mode }) => {
           output: {
             entryFileNames: (chunkInfo) => {
               return chunkInfo.name === 'firebase-messaging-sw' ? 'firebase-messaging-sw.js' : 'assets/[name]-[hash].js';
-            }
+            },
+            chunkFileNames: 'assets/[name]-[hash].js',
+            assetFileNames: 'assets/[name]-[hash].[ext]'
           }
-        }
+        },
+        // 빌드 최적화
+        target: 'es2015',
+        minify: 'esbuild',
+        sourcemap: false,
+        // 청크 크기 경고 비활성화
+        chunkSizeWarningLimit: 1000
       }
     };
 });
