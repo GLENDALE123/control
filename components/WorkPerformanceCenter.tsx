@@ -8,6 +8,8 @@ import firebase from 'firebase/compat/app';
 import { ProductionScheduleList } from './ProductionScheduleList';
 import OrderRegistrationList from './OrderRegistrationList';
 import { PRODUCTION_REQUEST_STATUS_COLORS } from '../constants';
+import ProcessConditionsModal from './work/ProcessConditionsModal';
+import { ComingSoonPlaceholder } from './shared';
 
 
 declare const html2canvas: any;
@@ -763,17 +765,6 @@ const ReportList: FC<{ reports: PackagingReport[], onEdit: (report: PackagingRep
 
 type ActiveWorkCenterTab = 'reportList' | 'reportForm' | 'scheduleList' | 'orderList' | 'prodMgmt';
 
-const ComingSoonPlaceholder: FC<{ title: string }> = ({ title }) => (
-    <div className="flex items-center justify-center h-full text-center p-4 bg-white dark:bg-slate-800 rounded-lg">
-        <div>
-            <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-16 w-16 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <h2 className="mt-4 text-2xl font-bold text-gray-800 dark:text-white">{title}</h2>
-            <p className="mt-2 text-gray-500 dark:text-slate-400">해당 기능은 현재 개발 중입니다. 곧 더 좋은 모습으로 찾아뵙겠습니다.</p>
-        </div>
-    </div>
-);
 
 // FIX: Add a helper function to get the local date string to fix timezone issues.
 const getLocalDateString = (date = new Date()) => {
@@ -918,89 +909,6 @@ const ShortageRequestDetailModal: FC<{
     );
 };
 
-const ProcessConditionsModal: FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    report: PackagingReport | null;
-    onSave: (reportId: string, conditions: PackagingReport['processConditions']) => void;
-    canManage: boolean;
-}> = ({ isOpen, onClose, report, onSave, canManage }) => {
-    const [conditionsData, setConditionsData] = useState<NonNullable<PackagingReport['processConditions']>>({});
-
-    useEffect(() => {
-        if (report) {
-            setConditionsData(report.processConditions || {});
-        }
-    }, [report]);
-
-    const handleChange = (coat: 'undercoat' | 'midcoat' | 'topcoat', field: 'conditions' | 'remarks', value: string) => {
-        setConditionsData(prev => ({
-            ...prev,
-            [coat]: {
-                ...(prev[coat] || { conditions: '', remarks: '' }),
-                [field]: value,
-            },
-        }));
-    };
-
-    const handleSave = () => {
-        if (report) {
-            onSave(report.id, conditionsData);
-        }
-    };
-    
-    if (!report) return null;
-
-    return (
-        <FullScreenModal isOpen={isOpen} onClose={onClose} title={`${report.productName} 공정 조건`}>
-            <div className="p-6 space-y-6">
-                <div className="space-y-4">
-                    <h4 className="text-lg font-semibold">하도</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">작업조건</label>
-                            <textarea value={conditionsData.undercoat?.conditions || ''} onChange={e => handleChange('undercoat', 'conditions', e.target.value)} disabled={!canManage} rows={4} className="mt-1 w-full p-2 border rounded bg-slate-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600"/>
-                        </div>
-                        <div>
-                            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">특이사항</label>
-                            <textarea value={conditionsData.undercoat?.remarks || ''} onChange={e => handleChange('undercoat', 'remarks', e.target.value)} disabled={!canManage} rows={4} className="mt-1 w-full p-2 border rounded bg-slate-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600"/>
-                        </div>
-                    </div>
-                </div>
-                 <div className="space-y-4">
-                    <h4 className="text-lg font-semibold">중도</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">작업조건</label>
-                            <textarea value={conditionsData.midcoat?.conditions || ''} onChange={e => handleChange('midcoat', 'conditions', e.target.value)} disabled={!canManage} rows={4} className="mt-1 w-full p-2 border rounded bg-slate-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600"/>
-                        </div>
-                        <div>
-                            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">특이사항</label>
-                            <textarea value={conditionsData.midcoat?.remarks || ''} onChange={e => handleChange('midcoat', 'remarks', e.target.value)} disabled={!canManage} rows={4} className="mt-1 w-full p-2 border rounded bg-slate-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600"/>
-                        </div>
-                    </div>
-                </div>
-                 <div className="space-y-4">
-                    <h4 className="text-lg font-semibold">상도</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">작업조건</label>
-                            <textarea value={conditionsData.topcoat?.conditions || ''} onChange={e => handleChange('topcoat', 'conditions', e.target.value)} disabled={!canManage} rows={4} className="mt-1 w-full p-2 border rounded bg-slate-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600"/>
-                        </div>
-                        <div>
-                            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">특이사항</label>
-                            <textarea value={conditionsData.topcoat?.remarks || ''} onChange={e => handleChange('topcoat', 'remarks', e.target.value)} disabled={!canManage} rows={4} className="mt-1 w-full p-2 border rounded bg-slate-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600"/>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div className="flex-shrink-0 p-4 border-t dark:border-slate-700 flex justify-end gap-2">
-                <button onClick={onClose} className="bg-slate-200 dark:bg-slate-600 px-4 py-2 rounded-md">취소</button>
-                {canManage && <button onClick={handleSave} className="bg-primary-600 text-white px-4 py-2 rounded-md">저장하기</button>}
-            </div>
-        </FullScreenModal>
-    );
-};
 
 // FIX: Changed component to a named export to resolve module resolution issues.
 export const WorkPerformanceCenter: React.FC<WorkPerformanceCenterProps> = ({ addToast, currentUserProfile, productionRequests, onOpenNewProductionRequest, onSelectProductionRequest, productionSchedules, onSaveProductionSchedules, onDeleteProductionSchedule, onDeleteProductionSchedulesByDate, orders, onSaveOrders }) => {
