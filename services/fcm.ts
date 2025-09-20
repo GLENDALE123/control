@@ -3,7 +3,7 @@ import 'firebase/compat/messaging';
 import 'firebase/compat/firestore';
 import { db, auth } from '../firebaseConfig';
 
-const VAPID_PUBLIC_KEY = 'BCiXh2gG9sI7meQzRYxF6cm1gLDY94KPb_IV3tChfzW1nVQLjw7IAxCb253nNarOYpaqmVz5t0SEHY83P8DFph8';
+const VAPID_PUBLIC_KEY = 'BJJPTFCxIgh2ddhl1vUAzQ-Cj_0RvUCx9xuxRdM9pb061G9YkCWqe9561VQDTnrPVm8j4SldzEl_2h0NPNlh_tE';
 
 export type FcmInitResult = { token: string | null; permission: NotificationPermission };
 
